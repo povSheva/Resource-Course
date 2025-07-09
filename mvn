@@ -1,0 +1,60 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------------< com.example:demo >--------------------------
+[INFO] Building demo 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] 6 problems were encountered while building the effective model for org.openjfx:javafx-controls:jar:win:20.0.2 during dependency collection step for project (use -X to see details)
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ demo ---
+[INFO] Deleting D:\Проекты\demo\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ demo ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.10.1:compile (default-compile) @ demo ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 10 source files to D:\Проекты\demo\target\classes
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: D:\Проекты\demo\src\main\java\com\example\demo\ui\ResourceManagerApp.java uses or overrides a deprecated API.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: Recompile with -Xlint:deprecation for details.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: D:\Проекты\demo\src\main\java\com\example\demo\ui\ResourceManagerApp.java uses unchecked or unsafe operations.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ demo ---
+[INFO] Deleting D:\Проекты\demo\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ demo ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.10.1:compile (default-compile) @ demo ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 10 source files to D:\Проекты\demo\target\classes
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: D:\Проекты\demo\src\main\java\com\example\demo\ui\ResourceManagerApp.java uses or overrides a deprecated API.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: Recompile with -Xlint:deprecation for details.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: D:\Проекты\demo\src\main\java\com\example\demo\ui\ResourceManagerApp.java uses unchecked or unsafe operations.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] >>> javafx:0.0.8:run (default-cli) > process-classes @ demo >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ demo ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.10.1:compile (default-compile) @ demo ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 10 source files to D:\Проекты\demo\target\classes
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: D:\Проекты\demo\src\main\java\com\example\demo\ui\ResourceManagerApp.java uses or overrides a deprecated API.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: Recompile with -Xlint:deprecation for details.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: D:\Проекты\demo\src\main\java\com\example\demo\ui\ResourceManagerApp.java uses unchecked or unsafe operations.
+[INFO] /D:/Проекты/demo/src/main/java/com/example/demo/ui/ResourceManagerApp.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] <<< javafx:0.0.8:run (default-cli) < process-classes @ demo <<<
+[INFO] 
+[INFO] 
+[INFO] --- javafx:0.0.8:run (default-cli) @ demo ---
+‡ ўҐаиЁвм ўлЇ®«­Ґ­ЁҐ Ї ЄҐв­®Ј® д ©«  [Y(¤ )/N(­Ґв)]? 
