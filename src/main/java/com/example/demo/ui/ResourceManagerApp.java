@@ -25,12 +25,6 @@ import javafx.util.Duration;
 
 import java.util.stream.Stream;
 
-/**
- * Ещё один раунд шлифовки по свежему макету:
- *  - Поисковая строка короче, радиус 6px, убрана синяя обводка, иконка слева.
- *  - Кнопка «Export» без рамки, более крупный полужирный шрифт.
- *  - «Traffic-lights» сохраняют предыдущие размеры и расположение.
- */
 public class ResourceManagerApp extends Application {
 
     private double xOffset, yOffset;
