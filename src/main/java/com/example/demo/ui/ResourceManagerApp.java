@@ -19,6 +19,7 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
@@ -94,6 +95,13 @@ public class ResourceManagerApp extends Application {
         exportBtn.setStyle("-fx-background-color: #f9fafb; -fx-background-radius: 8; " +
                 "-fx-font-size: 15px; -fx-font-family: 'Inter Semibold'; -fx-font-weight: 600; " +
                 "-fx-text-fill: #0f1113; -fx-padding: 6 32; -fx-border-color: transparent;");
+
+        exportBtn.setOnAction(e -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Выберите файл для экспорта");
+            fileChooser.showSaveDialog(exportBtn.getScene().getWindow());
+
+        });
 
         Region leftSpacer  = new Region();
         Region rightSpacer = new Region();
