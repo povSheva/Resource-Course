@@ -1,6 +1,6 @@
 package com.example.demo.ui;
 
-import com.example.demo.entity.Resource;
+import com.example.demo.entity.FileEntity;
 import com.example.demo.ui.controllers.ResourceController;
 import javafx.animation.*;
 import javafx.application.Application;
@@ -133,7 +133,7 @@ public class ResourceManagerApp extends Application {
     }
 
     private VBox buildCenter() {
-        TableView<Resource> table = createTable();
+        TableView<FileEntity> table = createTable();
         Label status = new Label(table.getItems().size() + " записей");
         VBox box = new VBox(5, table, status); box.setPadding(new Insets(10,0,0,0));
         return box;
@@ -170,30 +170,25 @@ public class ResourceManagerApp extends Application {
 
     // === Таблица ============================================================
 
-    private TableView<Resource> createTable(){
-        TableView<Resource> table = new TableView<>();
+    private TableView<FileEntity> createTable(){
+        TableView<FileEntity> table = new TableView<>();
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        TableColumn<Resource,String> nameCol = new TableColumn<>("Название");
+        TableColumn<FileEntity,String> nameCol = new TableColumn<>("Название");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
         nameCol.setCellFactory(c -> new TableCell<>(){
             @Override protected void updateItem(String item, boolean empty){
                 super.updateItem(item, empty);
                 if(empty||item==null){setGraphic(null);} else {
-                    Resource r=getTableView().getItems().get(getIndex());
+                    FileEntity r=getTableView().getItems().get(getIndex());
                     Label icon=new Label(switch(r.getType()){case"PDF"->"📄";case"Image"->"🖼️";default->"🔗";});
                     setGraphic(new HBox(5, icon, new Label(item)));
                 }
             }
         });
-        TableColumn<Resource,String> typeCol=new TableColumn<>("Тип"); typeCol.setCellValueFactory(new PropertyValueFactory<>("type"));
-        TableColumn<Resource,String> dateCol=new TableColumn<>("Дата"); dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        TableColumn<FileEntity,String> typeCol=new TableColumn<>("Тип"); typeCol.setCellValueFactory(new PropertyValueFactory<>("type"));
+        TableColumn<FileEntity,String> dateCol=new TableColumn<>("Дата"); dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
         table.getColumns().addAll(nameCol,typeCol,dateCol);
-        table.setItems(FXCollections.observableArrayList(
-                new Resource("Course Outline","PDF","04.01.2024"),
-                new Resource("Landscape Photo","Image","03.01.2024"),
-                new Resource("Course Information PDF","PDF","02.01.2024"),
-                new Resource("Image File","Image","02.01.2024"),
-                new Resource("Introduction to Course","Link","31.12.2023")));
+
         return table;
     }
 
