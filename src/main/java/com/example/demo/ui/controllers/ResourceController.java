@@ -41,11 +41,13 @@ public class ResourceController {
             String fileName = selectedFile.getName();
             String fileType = getFileExtension(fileName);
             String dateAdded = new SimpleDateFormat("dd.MM.yyyy").format(new Date());
+            String fileMemory = selectedFile.length() + "M";
 
             // Так для примера добавлю вывод
             System.out.println(fileName);
             System.out.println(fileType);
             System.out.println(dateAdded);
+            System.out.println(fileMemory);
 
             try {
                 Files.copy(selectedFile.toPath(), patchOfSelectedFile, StandardCopyOption.REPLACE_EXISTING);
@@ -60,7 +62,6 @@ public class ResourceController {
                 System.out.println("Файл не выбран!");
             }
     }
-
     // Тут просто вынес метод для получения расширения файла
 
     private String getFileExtension(String fileName) {

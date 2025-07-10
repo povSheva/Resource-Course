@@ -43,5 +43,9 @@
 
                    *test-пакеты (unit и интеграционные тесты для каждого слоя)
 
+<<<<<<< HEAD
 лично для меня строка запуска
 & "C:\Tools\apache-maven-3.9.10\bin\mvn.cmd" clean javafx:run
+=======
+!REzHWuv3KuR4Sn
+>>>>>>> main
