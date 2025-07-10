@@ -2,14 +2,15 @@ package com.example.demo.ui.controllers;
 
 import javafx.scene.control.Button;
 import javafx.stage.FileChooser;
-import javafx.stage.Window;
-
-import javax.sound.midi.Patch;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+
+// Получилось только так перенести обработку событий, уже лучше)
 
 public class ResourceController {
 
@@ -37,6 +38,15 @@ public class ResourceController {
 
             Path patchOfSelectedFile = Path.of(exampleFolder, selectedFile.getName());
 
+            String fileName = selectedFile.getName();
+            String fileType = getFileExtension(fileName);
+            String dateAdded = new SimpleDateFormat("dd.MM.yyyy").format(new Date());
+
+            // Так для примера добавлю вывод
+            System.out.println(fileName);
+            System.out.println(fileType);
+            System.out.println(dateAdded);
+
             try {
                 Files.copy(selectedFile.toPath(), patchOfSelectedFile, StandardCopyOption.REPLACE_EXISTING);
                 System.out.println("Удачно скопировался :)");
@@ -50,4 +60,17 @@ public class ResourceController {
                 System.out.println("Файл не выбран!");
             }
     }
+
+    // Тут просто вынес метод для получения расширения файла
+
+    private String getFileExtension(String fileName) {
+
+        if (fileName != null && fileName.lastIndexOf(".") != -1) {
+
+            return fileName.substring(fileName.lastIndexOf(".") + 1);
+        }
+
+        return "";
+    }
+
 }
