@@ -9,13 +9,13 @@ import java.util.UUID;
 public interface CrudDao <E, ID> {
     FileEntity save(FileEntity file);
 
-    Optional<FileEntity> findById(UUID uuid);
+    /*List<FileEntity> findAll();
 
-    List<FileEntity> findAll();
+    Optional<FileEntity> findById(UUID uuid);
 
     void deleteById(UUID uuid);
 
     List<FileEntity> findByOrigNameLike(String keyword);
 
-    List<FileEntity> findByType(String type);
+    List<FileEntity> findByType(String type);*/
 }
