@@ -6,7 +6,7 @@ import com.example.demo.entity.FileEntity;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 
 public class FileEntityDao implements CrudDao {
@@ -26,8 +26,8 @@ public class FileEntityDao implements CrudDao {
             stmt.setLong(3, file.getSizeBytes());
             stmt.execute();
 
-            file.setAddedAt(LocalDateTime.now());
-            file.setUpdatedAt(LocalDateTime.now());
+            file.setAddedAt(LocalDate.now());
+            file.setUpdatedAt(LocalDate.now());
 
             return file;
         } catch (SQLException e) {

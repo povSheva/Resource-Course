@@ -1,77 +1,53 @@
 package com.example.demo.ui.controllers;
 
-import javafx.scene.control.Button;
+import com.example.demo.entity.FileEntity;
+import com.example.demo.util.CreatFileEntity;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.stage.FileChooser;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 
-// Получилось только так перенести обработку событий, уже лучше)
+import java.io.File;
+import java.nio.file.Path;
 
 public class ResourceController {
 
-    public void onExportClick(Button exportBtn) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Выберите файл для экспорта");
+    // Каталог для хранения скопированных файлов
+    private static final Path EXPORT_FOLDER = Path.of("exports");
 
-        String exampleFolder = "exports";
-
-        File folder = new File(exampleFolder);
-        if (!folder.exists()) {
-            folder.mkdir();
-        }
-
-        fileChooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("PDF files (*.pdf)", "*.pdf"),
-                new FileChooser.ExtensionFilter("Image files (*.png, *.jpg, *.gif)", "*.png", "*.jpg", "*.gif"),
-                new FileChooser.ExtensionFilter("Word files (*.docx)", "*.docx"),
-                new FileChooser.ExtensionFilter("Excel files (*.xlsx)", "*.xlsx")
+    /**
+     * Вызывается при клике на кнопку «Экспорт» в вашем FXML.
+     * Берёт выбранный файл и передаёт его в сервис, получая обратно FileEntity.
+     */
+    @FXML
+    private void onExportClick(ActionEvent event) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Выберите файл для экспорта");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("PDF (*.pdf)", "*.pdf"),
+                new FileChooser.ExtensionFilter("Images (*.png, *.jpg, *.gif)", "*.png", "*.jpg", "*.gif"),
+                new FileChooser.ExtensionFilter("Word (*.docx)", "*.docx"),
+                new FileChooser.ExtensionFilter("Excel (*.xlsx)", "*.xlsx")
         );
 
-        File selectedFile = fileChooser.showSaveDialog(exportBtn.getScene().getWindow());
+        // здесь мы создаём переменную selectedFile
+        File selectedFile = chooser.showOpenDialog(
+                ((Node) event.getSource()).getScene().getWindow()
+        );
 
-        if (selectedFile != null) {
-
-            Path patchOfSelectedFile = Path.of(exampleFolder, selectedFile.getName());
-
-            String fileName = selectedFile.getName();
-            String fileType = getFileExtension(fileName);
-            String dateAdded = new SimpleDateFormat("dd.MM.yyyy").format(new Date());
-            String fileMemory = selectedFile.length() + "M";
-
-            // Так для примера добавлю вывод
-            System.out.println(fileName);
-            System.out.println(fileType);
-            System.out.println(dateAdded);
-            System.out.println(fileMemory);
-
-            try {
-                Files.copy(selectedFile.toPath(), patchOfSelectedFile, StandardCopyOption.REPLACE_EXISTING);
-                System.out.println("Удачно скопировался :)");
-
-            } catch (IOException e) {
-                System.out.println("Что-то пошло не так :(");
-                System.out.println("Ошибка: " + e);
-            }
-        }
-            else{
-                System.out.println("Файл не выбран!");
-            }
-    }
-    // Тут просто вынес метод для получения расширения файла
-
-    private String getFileExtension(String fileName) {
-
-        if (fileName != null && fileName.lastIndexOf(".") != -1) {
-
-            return fileName.substring(fileName.lastIndexOf(".") + 1);
+        if (selectedFile == null) {
+            System.out.println("Файл не выбран");
+            return;
         }
 
-        return "";
+        try {
+            // передаём именно selectedFile
+            FileEntity entity = CreatFileEntity.createFileEntity(selectedFile, EXPORT_FOLDER);
+            System.out.println("Импорт завершён: " + entity);
+            // → тут сохраняем entity в БД или передаём дальше
+        } catch (Exception ex) {
+            System.err.println("Ошибка при импорте файла: " + ex.getMessage());
+            ex.printStackTrace();
+        }
     }
-
 }
