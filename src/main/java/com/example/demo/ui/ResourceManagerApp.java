@@ -1,6 +1,7 @@
 package com.example.demo.ui;
 
 import com.example.demo.entity.Resource;
+import com.example.demo.ui.controllers.ResourceController;
 import javafx.animation.*;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
@@ -96,12 +97,9 @@ public class ResourceManagerApp extends Application {
                 "-fx-font-size: 15px; -fx-font-family: 'Inter Semibold'; -fx-font-weight: 600; " +
                 "-fx-text-fill: #0f1113; -fx-padding: 6 32; -fx-border-color: transparent;");
 
-        exportBtn.setOnAction(e -> {
-            FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Выберите файл для экспорта");
-            fileChooser.showSaveDialog(exportBtn.getScene().getWindow());
-
-        });
+        // Поднимает тут экземпляр контроллера и событие на кнопку
+        ResourceController resourceController = new ResourceController();
+        exportBtn.setOnAction(e -> resourceController.onExportClick(exportBtn));
 
         Region leftSpacer  = new Region();
         Region rightSpacer = new Region();
