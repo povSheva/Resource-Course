@@ -52,7 +52,7 @@
 
 -- 1) Таблица «живых» файлов
 CREATE TABLE files (
-  uuid         UUID        PRIMARY KEY,               -- уникальный идентификатор
+  uuid         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),               -- уникальный идентификатор
   orig_name    TEXT        NOT NULL,                  -- оригинальное имя файла
   type         TEXT        NOT NULL,                  -- pdf, docx, link, excel…
   size_bytes   BIGINT      NOT NULL,                  -- размер в байтах
