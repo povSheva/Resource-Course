@@ -8,10 +8,12 @@ public class FileEntityService {
     private FileEntityDao fileEntityDao;
 
     public FileEntity save(FileEntity file){
+
         return fileEntityDao.save(file);
     }
 
     public FileEntityService(FileEntityDao fileEntityDao){
+
         this.fileEntityDao = fileEntityDao;
     }
 

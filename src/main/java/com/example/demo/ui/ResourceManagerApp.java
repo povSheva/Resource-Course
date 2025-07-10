@@ -93,7 +93,7 @@ public class ResourceManagerApp extends Application {
 
         // Поднимает тут экземпляр контроллера и событие на кнопку
         ResourceController resourceController = new ResourceController();
-        exportBtn.setOnAction(e -> resourceController.onExportClick(exportBtn));
+        exportBtn.setOnAction(resourceController::onExportClick);
 
         Region leftSpacer  = new Region();
         Region rightSpacer = new Region();

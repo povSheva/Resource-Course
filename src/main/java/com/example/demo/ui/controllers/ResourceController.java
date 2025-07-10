@@ -20,7 +20,7 @@ public class ResourceController {
      * Берёт выбранный файл и передаёт его в сервис, получая обратно FileEntity.
      */
     @FXML
-    private void onExportClick(ActionEvent event) {
+    public void onExportClick(ActionEvent event) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Выберите файл для экспорта");
         chooser.getExtensionFilters().addAll(
