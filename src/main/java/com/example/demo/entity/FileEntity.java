@@ -26,17 +26,38 @@ public class FileEntity {
         this.updatedAt = updatedAt;
     }
 
+    public FileEntity(){
+
+    }
+
     // Геттеры
     public UUID getUuid()            { return uuid; }
     public String getOrigName()      { return origName; }
     public String getType()          { return type; }
     public Long getSizeBytes()       { return sizeBytes; }
+
+    public void setOrigName(String origName) {
+        this.origName = origName;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setSizeBytes(Long sizeBytes) {
+        this.sizeBytes = sizeBytes;
+    }
+
     public LocalDate getAddedAt()    { return addedAt; }
     public LocalDate getUpdatedAt()  { return updatedAt; }
 
     // Сеттеры (если нужны)
     public void setAddedAt(LocalDate d)   { this.addedAt = d; }
     public void setUpdatedAt(LocalDate d) { this.updatedAt = d; }
+
+    public void setUuid(UUID uuid){
+        this.uuid = uuid;
+    }
 
     @Override
     public String toString() {

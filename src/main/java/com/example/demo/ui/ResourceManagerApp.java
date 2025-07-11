@@ -1,11 +1,10 @@
 package com.example.demo.ui;
 
 import com.example.demo.entity.FileEntity;
-import com.example.demo.ui.controllers.ResourceController;
+import com.example.demo.controllers.ResourceController;
 import javafx.animation.*;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,7 +19,6 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
