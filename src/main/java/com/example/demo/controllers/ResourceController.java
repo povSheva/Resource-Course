@@ -4,6 +4,7 @@ import com.example.demo.dao.FileEntityDao;
 import com.example.demo.entity.FileEntity;
 import com.example.demo.service.FileEntityService;
 import com.example.demo.util.CreatFileEntity;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -13,6 +14,16 @@ import java.nio.file.Path;
 
 
 public class ResourceController {
+
+    private final FileEntityService service;
+    private final ObservableList<FileEntity> uiList;
+
+    // Новый конструктор — принимаем сервис и список
+    public ResourceController(FileEntityService service,
+                              ObservableList<FileEntity> uiList) {
+        this.service = service;
+        this.uiList  = uiList;
+    }
 
     // Каталог для хранения скопированных файлов
     public static final Path EXPORT_FOLDER = Path.of("exports");
@@ -46,14 +57,13 @@ public class ResourceController {
         try {
             // передаём именно selectedFile
             FileEntity entity = CreatFileEntity.createFileEntity(selectedFile, EXPORT_FOLDER);
-            System.out.println("Импорт завершён: " + entity);
+            System.out.println("Import is done: " + entity);
             // → тут сохраняем entity в БД или передаём дальше
-
 
             new FileEntityService(new FileEntityDao()).save(entity);
             System.out.println("GOTOVOx2");
         } catch (Exception ex) {
-            System.err.println("Ошибка при импорте файла: " + ex.getMessage());
+            System.err.println("Exeption import file: " + ex.getMessage());
             ex.printStackTrace();
         }
     }

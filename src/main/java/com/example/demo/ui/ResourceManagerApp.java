@@ -1,9 +1,12 @@
 package com.example.demo.ui;
 
+import com.example.demo.dao.FileEntityDao;
 import com.example.demo.entity.FileEntity;
 import com.example.demo.controllers.ResourceController;
+import com.example.demo.service.FileEntityService;
 import javafx.animation.*;
 import javafx.application.Application;
+import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
@@ -22,18 +25,26 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
+import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 public class ResourceManagerApp extends Application {
+
+    FileEntityDao dao = new FileEntityDao();
+    FileEntityService service = new FileEntityService(dao);
+    ObservableList<FileEntity> fileItems = FXCollections
+            .observableArrayList( dao.findAll() );
 
     private double xOffset, yOffset;
 
@@ -45,6 +56,27 @@ public class ResourceManagerApp extends Application {
         primaryStage.initStyle(StageStyle.TRANSPARENT);
 
 
+        // Ошибки с подключением к БД или файлами
+        try {
+            // загружаем из БД
+            List<FileEntity> all = dao.findAll();
+            fileItems.setAll(all);
+        } catch (Exception e) {
+            // распечатаем полный стектрейс в консоль
+            e.printStackTrace();
+
+            // а в диалоге покажем сообщение самого первопричинного SQLException
+            String cause = e.getCause() != null
+                    ? e.getCause().getMessage()
+                    : e.getMessage();
+            Alert err = new Alert(Alert.AlertType.ERROR,
+                    "Не удалось загрузить файлы:\n" + cause,
+                    ButtonType.OK);
+            err.showAndWait();
+            return;
+        }
+
+        // Основное содержимое
         BorderPane content = new BorderPane();
         content.setLeft(buildLeftBar());
         content.setCenter(buildCenter());
@@ -55,8 +87,6 @@ public class ResourceManagerApp extends Application {
         titleBar.setPadding(new Insets(12, 20, 12, 16));
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setStyle("-fx-background-color: #ffffff; -fx-border-color: #d0d0d0; -fx-border-width: 0 0 1 0;");
-
-        // Основное содержимое
 
         // Корень с округлёнными краями
         VBox rootPane = new VBox(titleBar, content);
@@ -98,8 +128,9 @@ public class ResourceManagerApp extends Application {
                 "-fx-text-fill: #0f1113; -fx-padding: 6 32; -fx-border-color: transparent;");
 
         // Поднимает тут экземпляр контроллера и событие на кнопку
-        ResourceController resourceController = new ResourceController();
-        exportBtn.setOnAction(resourceController::onExportClick);
+        ResourceController controller = new ResourceController(service, fileItems);
+        exportBtn.setOnAction(controller::onExportClick);
+
 
         Region leftSpacer  = new Region();
         Region rightSpacer = new Region();
@@ -130,7 +161,11 @@ public class ResourceManagerApp extends Application {
     private VBox buildLeftBar() {
         ListView<String> pinned = new ListView<>(FXCollections.observableArrayList("course-outline.pdf", "article-link"));
         pinned.setMaxHeight(100);
-        Button addBtn = new Button("+ Добавить ресурс"); addBtn.setMaxWidth(Double.MAX_VALUE);
+
+        Button addBtn = new Button("+ Добавить ресурс");
+        addBtn.setMaxWidth(Double.MAX_VALUE);
+        addBtn.setOnAction(e -> onAddResource());
+
         ListView<String> filters = new ListView<>(FXCollections.observableArrayList("All","PDF","Images","Links"));
         filters.setMaxHeight(120);
         VBox box = new VBox(10, new Label("Pinned"), pinned, addBtn, new Label("Filter"), filters);
@@ -139,9 +174,14 @@ public class ResourceManagerApp extends Application {
     }
 
     // === Новый центр: ListView вместо TableView ===========================
+
     private VBox buildCenter() {
         ListView<FileEntity> listView = createFileList();
-        Label status = new Label(listView.getItems().size() + " записей");
+        Label status = new Label();
+        status.textProperty().bind(
+                Bindings.size(fileItems)
+                        .asString("%d записей")
+        );
         VBox box = new VBox(5, listView, status);
         box.setPadding(new Insets(10, 0, 0, 0));
         return box;
@@ -179,28 +219,8 @@ public class ResourceManagerApp extends Application {
     // === Таблица ============================================================
 
     private ListView<FileEntity> createFileList() {
-        // 1) Тестовые данные
-        ObservableList<FileEntity> items = FXCollections.observableArrayList(
-                new FileEntity(
-                        UUID.randomUUID(),
-                        "Course Outline",
-                        "PDF",
-                        1024L,
-                        LocalDate.of(2024, 1, 4),
-                        LocalDate.of(2024, 1, 4)
-                ),
-                new FileEntity(
-                        UUID.randomUUID(),
-                        "Introduction to Course",
-                        "Docx",
-                        5120L,
-                        LocalDate.of(2023, 12, 31),
-                        LocalDate.of(2023, 12, 31)
-                )
 
-        );
-
-        ListView<FileEntity> listView = new ListView<>(items);
+        ListView<FileEntity> listView = new ListView<>(fileItems);
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         listView.setCellFactory(lv -> new ListCell<>() {
@@ -232,7 +252,7 @@ public class ResourceManagerApp extends Application {
                 if (empty || item == null) {
                     setGraphic(null);
                 } else {
-                    // 1) Путь к картинке (папка resources/images)
+
                     String path = switch (item.getType()) {
                         case "PDF"   -> "/images/pdf.png";
                         case "Image" -> "/images/image.png";
@@ -261,6 +281,37 @@ public class ResourceManagerApp extends Application {
         return listView;
     }
 
+    // Обработчик добавления ресурса: сохраняем в БД и в список
+    private void onAddResource() {
+        FileChooser chooser = new FileChooser();
+        File file = chooser.showOpenDialog(null);
+        if (file == null) return;
+
+        FileEntity newFile = new FileEntity();
+        newFile.setOrigName(file.getName());
+        newFile.setType(detectTypeByExtension(file));
+        newFile.setSizeBytes(file.length());
+        newFile = dao.save(newFile);
+
+        fileItems.add(newFile);
+    }
+
+    // Вспомогательный метод для определения типа по расширению
+    private String detectTypeByExtension(File file) {
+        String ext = "";
+        String name = file.getName();
+        int i = name.lastIndexOf('.');
+        if (i >= 0) ext = name.substring(i+1).toLowerCase();
+        switch (ext) {
+            case "pdf":  return "PDF";
+            case "png":
+            case "jpg":
+            case "jpeg": return "Image";
+            case "doc":
+            case "docx":return "Docx";
+            default:     return ext.toUpperCase();
+        }
+    }
 
     private VBox buildPreviewBox(){
         Label title=new Label("Course Outline"); title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");

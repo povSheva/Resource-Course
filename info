@@ -47,6 +47,8 @@
 лично для меня строка запуска
 & "C:\Tools\apache-maven-3.9.10\bin\mvn.cmd" clean javafx:run
 
+cd F:\MainProjDataDirection\Main\Resource-Course
+
 
 
 -- 1) Таблица «живых» файлов
