@@ -1,23 +1,25 @@
 package com.example.demo.controllers;
 
-import com.example.demo.dao.FileEntityDao;
 import com.example.demo.entity.FileEntity;
 import com.example.demo.service.FileEntityService;
-import com.example.demo.util.CreatFileEntity;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.stage.FileChooser;
+
 import java.io.File;
-import java.nio.file.Path;
 
-
+/**
+ * Контроллер кнопки «Import / Export». Работает через {@link FileEntityService}:
+ * сервис сам копирует файл в репозиторий, рассчитывает {@code storageKey}
+ * и сохраняет метаданные в БД.
+ */
 public class ResourceController {
 
     private final FileEntityService service;
-    private final ObservableList<FileEntity> uiList;   // ← тот самый список
+    private final ObservableList<FileEntity> uiList;
 
     public ResourceController(FileEntityService service,
                               ObservableList<FileEntity> uiList) {
@@ -25,13 +27,12 @@ public class ResourceController {
         this.uiList  = uiList;
     }
 
-    public static final Path EXPORT_FOLDER = Path.of("exports");
-
     @FXML
     public void onExportClick(ActionEvent event) {
 
+        /* ---------- диалог выбора файла -------------------------------- */
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Выберите файл для экспорта");
+        chooser.setTitle("Выберите файл для импорта");
         chooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("PDF",    "*.pdf", "*.PDF"),
                 new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"),
@@ -40,32 +41,22 @@ public class ResourceController {
                 new FileChooser.ExtensionFilter("Все файлы", "*.*")
         );
 
-
         File selected = chooser.showOpenDialog(
                 ((Node) event.getSource()).getScene().getWindow()
         );
         if (selected == null) return;
 
-        // --- фон: сохраняем файл и запись -------------------------------------------------
-        Task<FileEntity> saveTask = new Task<>() {
+        /* ---------- фон: копирование файла + запись в БД --------------- */
+        Task<FileEntity> uploadTask = new Task<>() {
             @Override protected FileEntity call() throws Exception {
-                FileEntity entity = CreatFileEntity.createFileEntity(selected, EXPORT_FOLDER);
-                return service.save(entity);
+                return service.uploadFile(selected);
             }
         };
 
-        // --- UI-поток: добавляем в ObservableList -----------------------------------------
-        saveTask.setOnSucceeded(e -> {
-            FileEntity saved = saveTask.getValue();
-            uiList.add(0, saved);
-        });
+        /* ---------- UI-поток: обновляем список -------------------------- */
+        uploadTask.setOnSucceeded(e -> uiList.add(0, uploadTask.getValue()));
+        uploadTask.setOnFailed(e -> uploadTask.getException().printStackTrace());
 
-        saveTask.setOnFailed(e -> {
-            Throwable ex = saveTask.getException();
-            System.err.println("Exception import: " + ex.getMessage());
-            ex.printStackTrace();
-        });
-
-        new Thread(saveTask, "import-task").start();
+        new Thread(uploadTask, "file-upload-task").start();
     }
 }

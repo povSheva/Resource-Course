@@ -3,31 +3,39 @@ package com.example.demo.dao;
 import com.example.demo.config.ConnectionManager;
 import com.example.demo.entity.FileEntity;
 
-import java.io.File;
 import java.sql.*;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-
+/**
+ * DAO для работы с таблицей files.
+ * Теперь поддерживает новое поле storage_key (относительный путь к файлу в репозитории).
+ */
 public class FileEntityDao implements CrudDao {
 
+    /**
+     * Вставка новой записи. Добавили колонку storage_key.
+     */
     private static final String INSERT_FILE = """
-    INSERT INTO files
-      (orig_name, type, size_bytes)
-    VALUES (?, ?, ?)
-    """;
+        INSERT INTO files
+          (storage_key, orig_name, type, size_bytes)
+        VALUES (?, ?, ?, ?)
+        """;
 
+    /**
+     * Выбор всех «живых» файлов с учётом storage_key.
+     */
     private static final String SELECT_ALL = """
-    SELECT uuid,
-           orig_name,
-           type,
-           size_bytes,
-           added_at,
-           updated_at
-      FROM files
-""";
+        SELECT uuid,
+               storage_key,
+               orig_name,
+               type,
+               size_bytes,
+               added_at,
+               updated_at
+          FROM files
+        """;
 
     @Override
     public FileEntity save(FileEntity file) {
@@ -37,9 +45,12 @@ public class FileEntityDao implements CrudDao {
                      Statement.RETURN_GENERATED_KEYS
              )) {
 
-            stmt.setString(1, file.getOrigName());
-            stmt.setString(2, file.getType());
-            stmt.setLong(3, file.getSizeBytes());
+            // 1) storage_key
+            stmt.setString(1, file.getStorageKey());
+            // 2) остальные поля как раньше
+            stmt.setString(2, file.getOrigName());
+            stmt.setString(3, file.getType());
+            stmt.setLong(4, file.getSizeBytes());
 
             int affected = stmt.executeUpdate();
             if (affected != 1) {
@@ -48,7 +59,6 @@ public class FileEntityDao implements CrudDao {
 
             try (ResultSet rs = stmt.getGeneratedKeys()) {
                 if (rs.next()) {
-                    // В PostgreSQL getGeneratedKeys() вернёт uuid, в других СУБД — только автогенерируемый ключ
                     UUID generatedUuid = rs.getObject(1, UUID.class);
                     file.setUuid(generatedUuid);
                 }
@@ -56,7 +66,6 @@ public class FileEntityDao implements CrudDao {
 
             return file;
         } catch (SQLException e) {
-            e.printStackTrace();
             throw new RuntimeException("Не удалось сохранить FileEntity", e);
         }
     }
@@ -71,11 +80,10 @@ public class FileEntityDao implements CrudDao {
             while (rs.next()) {
                 FileEntity f = new FileEntity();
                 f.setUuid(rs.getObject("uuid", UUID.class));
+                f.setStorageKey(rs.getString("storage_key"));
                 f.setOrigName(rs.getString("orig_name"));
                 f.setType(rs.getString("type"));
                 f.setSizeBytes(rs.getLong("size_bytes"));
-
-                // СЧИТАЕМ added_at, а не created_at
                 f.setAddedAt(rs.getTimestamp("added_at")
                         .toLocalDateTime()
                         .toLocalDate());
@@ -86,33 +94,10 @@ public class FileEntityDao implements CrudDao {
             }
             return list;
         } catch (SQLException e) {
-            e.printStackTrace();
             throw new RuntimeException("Не удалось получить список FileEntity", e);
         }
     }
 
-    /*@Override
-    public Optional<FileEntity> findById(UUID uuid) {
-        return Optional.empty();
-    }
-
-    @Override
-    public List<FileEntity> findAll() {
-        return null;
-    }
-
-    @Override
-    public void deleteById(UUID uuid) {
-
-    }
-
-    @Override
-    public List<FileEntity> findByOrigNameLike(String keyword) {
-        return null;
-    }
-
-    @Override
-    public List<FileEntity> findByType(String type) {
-        return null;
-    }*/
+    /* Остальные CRUD-методы (findById, deleteById, ...) остаются без изменений
+       и, при необходимости, должны быть дополнены работой со storage_key. */
 }

@@ -53,21 +53,24 @@ cd F:\MainProjDataDirection\Main\Resource-Course
 
 -- 1) Таблица «живых» файлов
 CREATE TABLE files (
-  uuid         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),               -- уникальный идентификатор
-  orig_name    TEXT        NOT NULL,                  -- оригинальное имя файла
-  type         TEXT        NOT NULL,                  -- pdf, docx, link, excel…
-  size_bytes   BIGINT      NOT NULL,                  -- размер в байтах
-  added_at     TIMESTAMP   NOT NULL DEFAULT NOW(),    -- когда добавлен
-  updated_at   TIMESTAMP   NOT NULL DEFAULT NOW()     -- когда метаданные обновлены
+  uuid          UUID        PRIMARY KEY DEFAULT gen_random_uuid(), -- уникальный идентификатор
+  storage_key   TEXT        NOT NULL,                              -- относительный путь/ключ в репозитории
+  orig_name     TEXT        NOT NULL,                              -- оригинальное имя файла
+  type          TEXT        NOT NULL,                              -- pdf, docx, link, excel…
+  size_bytes    BIGINT      NOT NULL,                              -- размер в байтах
+  added_at      TIMESTAMP   NOT NULL DEFAULT NOW(),                -- когда добавлен
+  updated_at    TIMESTAMP   NOT NULL DEFAULT NOW()                 -- когда метаданные обновлены
 );
 
 -- 2) Таблица «мусорки»
 CREATE TABLE files_trash (
-  uuid         UUID        PRIMARY KEY,               -- тот же UUID
-  orig_name    TEXT        NOT NULL,
-  type         TEXT        NOT NULL,
-  size_bytes   BIGINT      NOT NULL,
-  added_at     TIMESTAMP   NOT NULL,                  -- дата изначального добавления
-  updated_at   TIMESTAMP   NOT NULL,                  -- дата последнего изменения до удаления
-  deleted_at   TIMESTAMP   NOT NULL DEFAULT NOW()     -- когда переместили в корзину
+  uuid          UUID        PRIMARY KEY,                           -- тот же UUID
+  storage_key   TEXT        NOT NULL,                              -- относительный путь/ключ
+  orig_name     TEXT        NOT NULL,
+  type          TEXT        NOT NULL,
+  size_bytes    BIGINT      NOT NULL,
+  added_at      TIMESTAMP   NOT NULL,                              -- дата изначального добавления
+  updated_at    TIMESTAMP   NOT NULL,                              -- дата последнего изменения до удаления
+  deleted_at    TIMESTAMP   NOT NULL DEFAULT NOW()                 -- когда переместили в корзину
 );
+

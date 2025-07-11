@@ -24,7 +24,8 @@ public final class CreatFileEntity {
         LocalDate now = LocalDate.now();
 
         return new FileEntity(
-                UUID.randomUUID(),                   // uuid
+                UUID.randomUUID(),
+                "kfj",// uuid
                 sourceFile.getName(),                // origName
                 getExtension(sourceFile.getName()),  // type
                 sourceFile.length(),                 // sizeBytes
