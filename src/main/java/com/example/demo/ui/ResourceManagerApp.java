@@ -5,6 +5,7 @@ import com.example.demo.controllers.ResourceController;
 import javafx.animation.*;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,6 +13,8 @@ import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -23,6 +26,11 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
+import java.io.InputStream;
+import java.net.URL;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 public class ResourceManagerApp extends Application {
@@ -36,6 +44,12 @@ public class ResourceManagerApp extends Application {
         // Без системного заголовка
         primaryStage.initStyle(StageStyle.TRANSPARENT);
 
+
+        BorderPane content = new BorderPane();
+        content.setLeft(buildLeftBar());
+        content.setCenter(buildCenter());
+        content.setRight(buildPreviewBox());
+
         // Title-bar
         HBox titleBar = new HBox(8);
         titleBar.setPadding(new Insets(12, 20, 12, 16));
@@ -43,12 +57,6 @@ public class ResourceManagerApp extends Application {
         titleBar.setStyle("-fx-background-color: #ffffff; -fx-border-color: #d0d0d0; -fx-border-width: 0 0 1 0;");
 
         // Основное содержимое
-        BorderPane content = new BorderPane();
-        content.setPadding(new Insets(0, 10, 10, 10));
-
-        content.setLeft(buildLeftBar());
-        content.setCenter(buildCenter());
-        content.setRight(buildPreviewBox());
 
         // Корень с округлёнными краями
         VBox rootPane = new VBox(titleBar, content);
@@ -130,10 +138,12 @@ public class ResourceManagerApp extends Application {
         return box;
     }
 
+    // === Новый центр: ListView вместо TableView ===========================
     private VBox buildCenter() {
-        TableView<FileEntity> table = createTable();
-        Label status = new Label(table.getItems().size() + " записей");
-        VBox box = new VBox(5, table, status); box.setPadding(new Insets(10,0,0,0));
+        ListView<FileEntity> listView = createFileList();
+        Label status = new Label(listView.getItems().size() + " записей");
+        VBox box = new VBox(5, listView, status);
+        box.setPadding(new Insets(10, 0, 0, 0));
         return box;
     }
 
@@ -168,27 +178,89 @@ public class ResourceManagerApp extends Application {
 
     // === Таблица ============================================================
 
-    private TableView<FileEntity> createTable(){
-        TableView<FileEntity> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        TableColumn<FileEntity,String> nameCol = new TableColumn<>("Название");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
-        nameCol.setCellFactory(c -> new TableCell<>(){
-            @Override protected void updateItem(String item, boolean empty){
+    private ListView<FileEntity> createFileList() {
+        // 1) Тестовые данные
+        ObservableList<FileEntity> items = FXCollections.observableArrayList(
+                new FileEntity(
+                        UUID.randomUUID(),
+                        "Course Outline",
+                        "PDF",
+                        1024L,
+                        LocalDate.of(2024, 1, 4),
+                        LocalDate.of(2024, 1, 4)
+                ),
+                new FileEntity(
+                        UUID.randomUUID(),
+                        "Introduction to Course",
+                        "Docx",
+                        5120L,
+                        LocalDate.of(2023, 12, 31),
+                        LocalDate.of(2023, 12, 31)
+                )
+
+        );
+
+        ListView<FileEntity> listView = new ListView<>(items);
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+        listView.setCellFactory(lv -> new ListCell<>() {
+            private final HBox      row  = new HBox(10);
+            private final ImageView icon = new ImageView();
+            private final Label     name = new Label();
+            private final Label     type = new Label();
+            private final Label     date = new Label();
+
+            {
+                icon.setFitWidth(24);
+                icon.setFitHeight(24);
+
+                HBox.setHgrow(name, Priority.ALWAYS);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(8));
+                row.setStyle(
+                        "-fx-background-color: #ffffff; " +
+                                "-fx-background-radius: 8; " +
+                                "-fx-border-radius: 8; " +
+                                "-fx-border-color: #e0e0e0;"
+                );
+                row.getChildren().addAll(icon, name, type, date);
+            }
+
+            @Override
+            protected void updateItem(FileEntity item, boolean empty) {
                 super.updateItem(item, empty);
-                if(empty||item==null){setGraphic(null);} else {
-                    FileEntity r=getTableView().getItems().get(getIndex());
-                    Label icon=new Label(switch(r.getType()){case"PDF"->"📄";case"Image"->"🖼️";default->"🔗";});
-                    setGraphic(new HBox(5, icon, new Label(item)));
+                if (empty || item == null) {
+                    setGraphic(null);
+                } else {
+                    // 1) Путь к картинке (папка resources/images)
+                    String path = switch (item.getType()) {
+                        case "PDF"   -> "/images/pdf.png";
+                        case "Image" -> "/images/image.png";
+                        default      -> "/images/file.png";
+                    };
+
+                    URL resUrl = getClass().getResource(path);
+                    System.out.println("Loading resource [" + path + "] → " + resUrl);
+
+                    if (resUrl != null) {
+                        icon.setImage(new Image(resUrl.toExternalForm()));
+                    } else {
+                        icon.setImage(null);
+                    }
+
+                    name.setText(item.getOrigName());
+                    type.setText(item.getType());
+                    date.setText(item.getAddedAt().format(fmt));
+
+                    setGraphic(row);
                 }
             }
         });
-        TableColumn<FileEntity,String> typeCol=new TableColumn<>("Тип"); typeCol.setCellValueFactory(new PropertyValueFactory<>("type"));
-        TableColumn<FileEntity,String> dateCol=new TableColumn<>("Дата"); dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
-        table.getColumns().addAll(nameCol,typeCol,dateCol);
 
-        return table;
+        listView.setPrefHeight(400);
+        return listView;
     }
+
 
     private VBox buildPreviewBox(){
         Label title=new Label("Course Outline"); title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
