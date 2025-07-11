@@ -5,6 +5,7 @@ import com.example.demo.entity.FileEntity;
 import com.example.demo.service.FileEntityService;
 import com.example.demo.util.CreatFileEntity;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -16,56 +17,55 @@ import java.nio.file.Path;
 public class ResourceController {
 
     private final FileEntityService service;
-    private final ObservableList<FileEntity> uiList;
+    private final ObservableList<FileEntity> uiList;   // ← тот самый список
 
-    // Новый конструктор — принимаем сервис и список
     public ResourceController(FileEntityService service,
                               ObservableList<FileEntity> uiList) {
         this.service = service;
         this.uiList  = uiList;
     }
 
-    // Каталог для хранения скопированных файлов
     public static final Path EXPORT_FOLDER = Path.of("exports");
-
-    /**
-     * Вызывается при клике на кнопку «Экспорт» в вашем FXML.
-     * Берёт выбранный файл и передаёт его в сервис, получая обратно FileEntity.
-     */
 
     @FXML
     public void onExportClick(ActionEvent event) {
+
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Выберите файл для экспорта");
         chooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("PDF (.pdf,.PDF)", ".pdf", ".PDF"),
-                new FileChooser.ExtensionFilter("Images (*.png, *.jpg, *.gif)", "*.png", "*.jpg", "*.gif"),
-                new FileChooser.ExtensionFilter("Word (*.docx)", "*.docx"),
-                new FileChooser.ExtensionFilter("Excel (*.xlsx)", "*.xlsx")
+                new FileChooser.ExtensionFilter("PDF",    "*.pdf", "*.PDF"),
+                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"),
+                new FileChooser.ExtensionFilter("Word",   "*.doc", "*.docx"),
+                new FileChooser.ExtensionFilter("Excel",  "*.xls", "*.xlsx"),
+                new FileChooser.ExtensionFilter("Все файлы", "*.*")
         );
 
-        // здесь мы создаём переменную selectedFile
-        File selectedFile = chooser.showOpenDialog(
+
+        File selected = chooser.showOpenDialog(
                 ((Node) event.getSource()).getScene().getWindow()
         );
+        if (selected == null) return;
 
-        if (selectedFile == null) {
-            System.out.println("Файл не выбран");
-            return;
-        }
+        // --- фон: сохраняем файл и запись -------------------------------------------------
+        Task<FileEntity> saveTask = new Task<>() {
+            @Override protected FileEntity call() throws Exception {
+                FileEntity entity = CreatFileEntity.createFileEntity(selected, EXPORT_FOLDER);
+                return service.save(entity);
+            }
+        };
 
-        try {
-            // передаём именно selectedFile
-            FileEntity entity = CreatFileEntity.createFileEntity(selectedFile, EXPORT_FOLDER);
-            System.out.println("Import is done: " + entity);
-            // → тут сохраняем entity в БД или передаём дальше
+        // --- UI-поток: добавляем в ObservableList -----------------------------------------
+        saveTask.setOnSucceeded(e -> {
+            FileEntity saved = saveTask.getValue();
+            uiList.add(0, saved);
+        });
 
-            new FileEntityService(new FileEntityDao()).save(entity);
-            System.out.println("GOTOVOx2");
-        } catch (Exception ex) {
-            System.err.println("Exeption import file: " + ex.getMessage());
+        saveTask.setOnFailed(e -> {
+            Throwable ex = saveTask.getException();
+            System.err.println("Exception import: " + ex.getMessage());
             ex.printStackTrace();
-        }
-    }
+        });
 
+        new Thread(saveTask, "import-task").start();
+    }
 }

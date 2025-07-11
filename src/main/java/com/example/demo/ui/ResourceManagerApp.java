@@ -31,12 +31,9 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
 import java.io.File;
-import java.io.InputStream;
 import java.net.URL;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 public class ResourceManagerApp extends Application {
@@ -58,14 +55,12 @@ public class ResourceManagerApp extends Application {
 
         // Ошибки с подключением к БД или файлами
         try {
-            // загружаем из БД
             List<FileEntity> all = dao.findAll();
             fileItems.setAll(all);
         } catch (Exception e) {
-            // распечатаем полный стектрейс в консоль
+
             e.printStackTrace();
 
-            // а в диалоге покажем сообщение самого первопричинного SQLException
             String cause = e.getCause() != null
                     ? e.getCause().getMessage()
                     : e.getMessage();
@@ -246,36 +241,37 @@ public class ResourceManagerApp extends Application {
                 row.getChildren().addAll(icon, name, type, date);
             }
 
-            @Override
-            protected void updateItem(FileEntity item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setGraphic(null);
-                } else {
+                    @Override
+                    protected void updateItem(FileEntity item, boolean empty) {
+                        super.updateItem(item, empty);
 
-                    String path = switch (item.getType()) {
-                        case "PDF"   -> "/images/pdf.png";
-                        case "Image" -> "/images/image.png";
-                        default      -> "/images/file.png";
-                    };
+                        if (empty || item == null) {
+                            setGraphic(null);
+                            return;
+                        }
 
-                    URL resUrl = getClass().getResource(path);
-                    System.out.println("Loading resource [" + path + "] → " + resUrl);
+                        String iconPath;
+                        switch (item.getType().toUpperCase()) {
+                            case "PDF"   -> iconPath = "/images/pdf.png";
+                            case "IMAGE" -> iconPath = "/images/image.png";
+                            default      -> iconPath = "/images/file.png";
+                        }
 
-                    if (resUrl != null) {
-                        icon.setImage(new Image(resUrl.toExternalForm()));
-                    } else {
-                        icon.setImage(null);
+                        URL resUrl = getClass().getResource(iconPath);
+                        if (resUrl == null) {
+                            System.err.println("Icon not found: " + iconPath);
+                            icon.setImage(null);
+                        } else {
+                            icon.setImage(new Image(resUrl.toExternalForm()));
+                        }
+
+                        name.setText(item.getOrigName());
+                        type.setText(item.getType());
+                        date.setText(item.getAddedAt().format(fmt));
+                        setGraphic(row);
                     }
-
-                    name.setText(item.getOrigName());
-                    type.setText(item.getType());
-                    date.setText(item.getAddedAt().format(fmt));
-
-                    setGraphic(row);
-                }
-            }
         });
+
 
         listView.setPrefHeight(400);
         return listView;
@@ -294,6 +290,7 @@ public class ResourceManagerApp extends Application {
         newFile = dao.save(newFile);
 
         fileItems.add(newFile);
+        fileItems.setAll(dao.findAll());
     }
 
     // Вспомогательный метод для определения типа по расширению

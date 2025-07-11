@@ -3,6 +3,7 @@ package com.example.demo.dao;
 import com.example.demo.config.ConnectionManager;
 import com.example.demo.entity.FileEntity;
 
+import java.io.File;
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -89,6 +90,7 @@ public class FileEntityDao implements CrudDao {
             throw new RuntimeException("Не удалось получить список FileEntity", e);
         }
     }
+
     /*@Override
     public Optional<FileEntity> findById(UUID uuid) {
         return Optional.empty();
