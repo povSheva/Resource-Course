@@ -11,6 +11,7 @@ import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
+import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -45,9 +46,6 @@ import java.util.stream.Stream;
  * чтобы UI не знал ничего о {@link java.sql.Connection} и {@link java.nio.file.Path}.
  */
 public class ResourceManagerApp extends Application {
-
-    /* ===================================================================== */
-    /* === Dependencies & State =========================================== */
 
     private final FileEntityService service = new FileEntityService(
             new FileEntityDao(),
@@ -129,7 +127,8 @@ public class ResourceManagerApp extends Application {
         );
         Label searchIcon = new Label("🔍");
         searchIcon.setMouseTransparent(true);
-        StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 8));
+        // Иконку поиска в нормальное место подвинул
+        StackPane.setMargin(searchIcon, new Insets(0, 0, 0, -385));
         StackPane searchBox = new StackPane(searchField, searchIcon);
 
         // Export button ----------------------------------------------------
@@ -172,14 +171,55 @@ public class ResourceManagerApp extends Application {
         addBtn.setMaxWidth(Double.MAX_VALUE);
         addBtn.setOnAction(e -> onAddResource());
 
-        ListView<String> filters = new ListView<>(FXCollections.observableArrayList("All", "PDF", "Images", "Links"));
-        filters.setMaxHeight(120);
+        VBox filterBox = new VBox(10);
+        filterBox.setPadding(new Insets(8));
+        filterBox.setMaxHeight(160);
 
-        VBox box = new VBox(10, new Label("Pinned"), pinned, addBtn, new Label("Filter"), filters);
+        filterBox.getChildren().addAll(
+                createFilterRow("All"),
+                createFilterRow("PDF"),
+                createFilterRow("Images"),
+                createFilterRow("Links")
+        );
+
+        VBox box = new VBox(10,
+                new Label("Pinned"),
+                pinned,
+                addBtn,
+                new Label("Filter"),
+                filterBox
+        );
         box.setPadding(new Insets(10));
         box.setPrefWidth(200);
         return box;
     }
+
+    // вспомогательный метод для создания строк фильтров
+    private GridPane createFilterRow(String labelText) {
+        Label label = new Label(labelText);
+        CheckBox checkBox = new CheckBox();
+
+        GridPane grid = new GridPane();
+        // меняем для изменения расстояния между текстом и чекбоксами
+        grid.setHgap(45);
+        grid.setAlignment(Pos.CENTER_LEFT);
+
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setMinWidth(70);
+        col1.setHalignment(HPos.LEFT);
+
+        ColumnConstraints col2 = new ColumnConstraints();
+        col2.setHalignment(HPos.RIGHT);
+
+        grid.getColumnConstraints().addAll(col1, col2);
+
+        grid.add(label, 0, 0);
+        grid.add(checkBox, 1, 0);
+
+        return grid;
+    }
+
+
 
     /* ===================================================================== */
     /* === Center: ListView with files ===================================== */
@@ -248,7 +288,8 @@ public class ResourceManagerApp extends Application {
                         Text before = new Text(fullName.substring(0, idx));
                         // совпавшая часть — Label с жёлтым фоном
                         Label match = new Label(fullName.substring(idx, idx + q.length()));
-                        match.setStyle("-fx-background-color: yellow; -fx-text-fill: black;");
+                        // смягчим немного
+                        match.setStyle("-fx-background-color: yellow; -fx-text-fill: black; -fx-background-radius: 6");
                         // после
                         Text after = new Text(fullName.substring(idx + q.length()));
                         nameFlow.getChildren().addAll(before, match, after);

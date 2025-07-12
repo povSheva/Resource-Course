@@ -49,6 +49,10 @@
 
 cd F:\MainProjDataDirection\Main\Resource-Course
 
+& 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres -l
+
+& 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres -d demo
+
 
 
 -- 1) Таблица «живых» файлов
@@ -93,9 +97,6 @@ CREATE TABLE file_metadata_trash (
     tag             TEXT,                             -- тег
     additional_info TEXT                              -- доп. информация
 );
-
-
-
 
 -- Функция для авто-обновления поля updated_at в file_metadata
 CREATE OR REPLACE FUNCTION touch_file_metadata_updated_at()
