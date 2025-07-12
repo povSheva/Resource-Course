@@ -1,6 +1,7 @@
 package com.example.demo.ui;
 
 import com.example.demo.controllers.ResourceController;
+import com.example.demo.controllers.SearchController;
 import com.example.demo.dao.FileEntityDao;
 import com.example.demo.entity.FileEntity;
 import com.example.demo.service.FileEntityService;
@@ -24,6 +25,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -51,6 +54,10 @@ public class ResourceManagerApp extends Application {
             System.getProperty("repo.root", "exports"));
     private final ObservableList<FileEntity> fileItems = FXCollections.observableArrayList();
 
+    private SearchController searchController;
+
+    private TextField searchField;
+
     private double xOffset; // для перетаскивания окна
     private double yOffset;
 
@@ -63,10 +70,13 @@ public class ResourceManagerApp extends Application {
     public void start(Stage primaryStage) {
         primaryStage.initStyle(StageStyle.TRANSPARENT);
 
+        HBox titleBar = buildTitleBar(primaryStage);
+
         // Загружаем данные --------------------------------------------------
         try {
             List<FileEntity> all = service.findAll();
             fileItems.setAll(all);
+            searchController = new SearchController(fileItems);
         } catch (Exception ex) {
             showErrorAndExit("Не удалось загрузить список файлов", ex);
             return;
@@ -78,7 +88,6 @@ public class ResourceManagerApp extends Application {
         content.setCenter(buildCenter());
         content.setRight(buildPreviewBox());
 
-        HBox titleBar = buildTitleBar(primaryStage);
         VBox rootPane = wrapWithRoundedWindow(titleBar, content);
 
         /* === Scene ======================================================= */
@@ -108,13 +117,16 @@ public class ResourceManagerApp extends Application {
         });
 
         // Search box -------------------------------------------------------
-        TextField searchField = new TextField();
+        searchField = new TextField();
         searchField.setPromptText("Search");
         searchField.setPrefWidth(420);
         searchField.setStyle("-fx-background-radius: 6; -fx-border-radius: 6; " +
                 "-fx-border-color: #d0d4d9; -fx-background-color: #f9fafb; " +
                 "-fx-padding: 6 12 6 36; " +
                 "-fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
+        searchField.textProperty().addListener((obs, old, nw) ->
+                searchController.onSearch(nw)
+        );
         Label searchIcon = new Label("🔍");
         searchIcon.setMouseTransparent(true);
         StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 8));
@@ -189,37 +201,76 @@ public class ResourceManagerApp extends Application {
         lv.setCellFactory(view -> new ListCell<>() {
             private final HBox row  = new HBox(10);
             private final ImageView icon = new ImageView();
-            private final Label name = new Label();
+            private final TextFlow nameFlow = new TextFlow();
             private final Label type = new Label();
             private final Label date = new Label();
+
             {
-                icon.setFitWidth(24); icon.setFitHeight(24);
-                HBox.setHgrow(name, Priority.ALWAYS);
+                icon.setFitWidth(24);
+                icon.setFitHeight(24);
+                HBox.setHgrow(nameFlow, Priority.ALWAYS);
                 row.setAlignment(Pos.CENTER_LEFT);
                 row.setPadding(new Insets(8));
-                row.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #e0e0e0;");
-                row.getChildren().addAll(icon, name, type, date);
+                row.setStyle(
+                        "-fx-background-color: #ffffff; " +
+                                "-fx-background-radius: 8; " +
+                                "-fx-border-radius: 8; " +
+                                "-fx-border-color: #e0e0e0;"
+                );
+                row.getChildren().addAll(icon, nameFlow, type, date);
             }
-            @Override protected void updateItem(FileEntity item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) { setGraphic(null); return; }
 
+            @Override
+            protected void updateItem(FileEntity item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+
+                // — иконка
                 URL resUrl = getClass().getResource(switch (item.getType().toUpperCase()) {
                     case "PDF"   -> "/images/pdf.png";
                     case "IMAGE" -> "/images/image.png";
-                    default       -> "/images/file.png";
+                    default      -> "/images/file.png";
                 });
                 icon.setImage(resUrl != null ? new Image(resUrl.toExternalForm()) : null);
 
-                name.setText(item.getOrigName());
+                // — подсветка совпадения
+                nameFlow.getChildren().clear();
+                String fullName = item.getOrigName();
+                String q = searchField.getText().toLowerCase();
+                if (q != null && !q.isBlank()) {
+                    String lower = fullName.toLowerCase();
+                    int idx = lower.indexOf(q);
+                    if (idx >= 0) {
+                        // до
+                        Text before = new Text(fullName.substring(0, idx));
+                        // совпавшая часть — Label с жёлтым фоном
+                        Label match = new Label(fullName.substring(idx, idx + q.length()));
+                        match.setStyle("-fx-background-color: yellow; -fx-text-fill: black;");
+                        // после
+                        Text after = new Text(fullName.substring(idx + q.length()));
+                        nameFlow.getChildren().addAll(before, match, after);
+                    } else {
+                        nameFlow.getChildren().add(new Text(fullName));
+                    }
+                } else {
+                    nameFlow.getChildren().add(new Text(fullName));
+                }
+
+                // — остальные поля
                 type.setText(item.getType());
                 date.setText(item.getAddedAt().format(fmt));
+
                 setGraphic(row);
             }
         });
+
         lv.setPrefHeight(400);
         return lv;
     }
+
 
     /* ===================================================================== */
     /* === Right preview placeholder ====================================== */
@@ -247,7 +298,8 @@ public class ResourceManagerApp extends Application {
 
         try {
             FileEntity saved = service.uploadFile(file); // сохраняет файл + метадату
-            fileItems.add(saved);
+            // 4) Добавляем через SearchController, чтобы оба списка остались синхронизированы
+            searchController.onAddNew(saved);
         } catch (Exception ex) {
             showError("Не удалось добавить файл", ex);
         }
