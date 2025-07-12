@@ -1,5 +1,6 @@
 package com.example.demo.ui;
 
+import com.example.demo.controllers.FilterController;
 import com.example.demo.controllers.ResourceController;
 import com.example.demo.controllers.SearchController;
 import com.example.demo.dao.FileEntityDao;
@@ -7,7 +8,9 @@ import com.example.demo.entity.FileEntity;
 import com.example.demo.service.FileEntityService;
 import javafx.animation.*;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.BooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
@@ -70,26 +73,23 @@ public class ResourceManagerApp extends Application {
 
         HBox titleBar = buildTitleBar(primaryStage);
 
-        // Загружаем данные --------------------------------------------------
-        try {
-            List<FileEntity> all = service.findAll();
-            fileItems.setAll(all);
-            searchController = new SearchController(fileItems);
-        } catch (Exception ex) {
-            showErrorAndExit("Не удалось загрузить список файлов", ex);
-            return;
-        }
+        /* ---------- данные из сервиса ---------- */
+        List<FileEntity> all = service.findAll();
+        fileItems.setAll(all);
 
-        /* === UI layout =================================================== */
-        BorderPane content = new BorderPane();
-        content.setLeft(buildLeftBar());
+        /* ---------- контроллеры ---------- */
+        FilterController filterController = new FilterController(fileItems);
+        searchController = new SearchController(filterController);
+
+        /* ---------- UI-layout ---------- */
+        BorderPane content = new BorderPane();                     // <-- объявляем СНАЧАЛА
+        content.setLeft  (buildLeftBar(filterController));         // передаём filterController
         content.setCenter(buildCenter());
-        content.setRight(buildPreviewBox());
+        content.setRight (buildPreviewBox());
 
-        VBox rootPane = wrapWithRoundedWindow(titleBar, content);
+        VBox root = wrapWithRoundedWindow(titleBar, content);
 
-        /* === Scene ======================================================= */
-        Scene scene = new Scene(rootPane, 900, 600);
+        Scene scene = new Scene(root, 900, 600);
         scene.setFill(Color.TRANSPARENT);
         primaryStage.setScene(scene);
         primaryStage.show();
@@ -163,63 +163,60 @@ public class ResourceManagerApp extends Application {
     /* ===================================================================== */
     /* === Left bar (pinned + filter) ===================================== */
 
-    private VBox buildLeftBar() {
-        ListView<String> pinned = new ListView<>(FXCollections.observableArrayList("course-outline.pdf", "article-link"));
+    private VBox buildLeftBar(FilterController filterCtrl) {
+
+        ListView<String> pinned = new ListView<>(FXCollections.observableArrayList(
+                "course-outline.pdf", "article-link"));
         pinned.setMaxHeight(100);
 
         Button addBtn = new Button("+ Добавить ресурс");
         addBtn.setMaxWidth(Double.MAX_VALUE);
         addBtn.setOnAction(e -> onAddResource());
 
-        VBox filterBox = new VBox(10);
+        VBox filterBox = new VBox(8);
         filterBox.setPadding(new Insets(8));
         filterBox.setMaxHeight(160);
 
-        filterBox.getChildren().addAll(
-                createFilterRow("All"),
-                createFilterRow("PDF"),
-                createFilterRow("Images"),
-                createFilterRow("Links")
+        filterCtrl.getTypeChecks().forEach((type, prop) -> {
+            filterBox.getChildren().add(makeRow(type, prop));
+        });
+
+        filterCtrl.addTypeAddedListener(entry ->
+                Platform.runLater(() -> filterBox.getChildren().add(makeRow(entry.getKey(), entry.getValue())))
         );
 
-        VBox box = new VBox(10,
-                new Label("Pinned"),
-                pinned,
+        return new VBox(10,
+                new Label("Pinned"), pinned,
                 addBtn,
-                new Label("Filter"),
-                filterBox
+                new Label("Filter"), filterBox
         );
-        box.setPadding(new Insets(10));
-        box.setPrefWidth(200);
-        return box;
+    }
+
+    /** создаёт строку «текст  ––  чекбокс» и биндит property */
+    private GridPane makeRow(String type, BooleanProperty prop) {
+        CheckBox cb = new CheckBox();
+        cb.selectedProperty().bindBidirectional(prop);
+        return createFilterRow(type, cb);
     }
 
     // вспомогательный метод для создания строк фильтров
-    private GridPane createFilterRow(String labelText) {
+    private GridPane createFilterRow(String labelText, CheckBox cb) {
         Label label = new Label(labelText);
-        CheckBox checkBox = new CheckBox();
+        cb.setText("");
 
-        GridPane grid = new GridPane();
-        // меняем для изменения расстояния между текстом и чекбоксами
-        grid.setHgap(45);
-        grid.setAlignment(Pos.CENTER_LEFT);
+        GridPane row = new GridPane();
+        row.setHgap(45);
+        row.setAlignment(Pos.CENTER_LEFT);
 
-        ColumnConstraints col1 = new ColumnConstraints();
-        col1.setMinWidth(70);
-        col1.setHalignment(HPos.LEFT);
-
+        ColumnConstraints col1 = new ColumnConstraints(70);
         ColumnConstraints col2 = new ColumnConstraints();
         col2.setHalignment(HPos.RIGHT);
 
-        grid.getColumnConstraints().addAll(col1, col2);
-
-        grid.add(label, 0, 0);
-        grid.add(checkBox, 1, 0);
-
-        return grid;
+        row.getColumnConstraints().addAll(col1, col2);
+        row.add(label, 0, 0);
+        row.add(cb,    1, 0);
+        return row;
     }
-
-
 
     /* ===================================================================== */
     /* === Center: ListView with files ===================================== */
@@ -235,11 +232,13 @@ public class ResourceManagerApp extends Application {
     }
 
     private ListView<FileEntity> createFileList() {
+
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         ListView<FileEntity> lv = new ListView<>(fileItems);
 
         lv.setCellFactory(view -> new ListCell<>() {
-            private final HBox row  = new HBox(10);
+
+            private final HBox  row   = new HBox(10);
             private final ImageView icon = new ImageView();
             private final TextFlow nameFlow = new TextFlow();
             private final Label type = new Label();
@@ -248,27 +247,24 @@ public class ResourceManagerApp extends Application {
             {
                 icon.setFitWidth(24);
                 icon.setFitHeight(24);
+
                 HBox.setHgrow(nameFlow, Priority.ALWAYS);
                 row.setAlignment(Pos.CENTER_LEFT);
                 row.setPadding(new Insets(8));
-                row.setStyle(
-                        "-fx-background-color: #ffffff; " +
-                                "-fx-background-radius: 8; " +
-                                "-fx-border-radius: 8; " +
-                                "-fx-border-color: #e0e0e0;"
-                );
+                row.setStyle("""
+                    -fx-background-color: #ffffff;
+                    -fx-background-radius: 8;
+                    -fx-border-radius: 8;
+                    -fx-border-color: #e0e0e0;
+                    """);
                 row.getChildren().addAll(icon, nameFlow, type, date);
             }
 
             @Override
             protected void updateItem(FileEntity item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setGraphic(null);
-                    return;
-                }
+                if (empty || item == null) { setGraphic(null); return; }
 
-                // — иконка
                 URL resUrl = getClass().getResource(switch (item.getType().toUpperCase()) {
                     case "PDF"   -> "/images/pdf.png";
                     case "IMAGE" -> "/images/image.png";
@@ -276,31 +272,45 @@ public class ResourceManagerApp extends Application {
                 });
                 icon.setImage(resUrl != null ? new Image(resUrl.toExternalForm()) : null);
 
-                // — подсветка совпадения
+                /* я крч столкнулся с проблемой, если название большое то оно
+                 выталкивает все остальное за границы,
+                 вот фикс(адаптивоне ограничение размеров) */
+
                 nameFlow.getChildren().clear();
                 String fullName = item.getOrigName();
-                String q = searchField.getText().toLowerCase();
-                if (q != null && !q.isBlank()) {
-                    String lower = fullName.toLowerCase();
-                    int idx = lower.indexOf(q);
+                String search   = searchField.getText();
+
+                double listW  = getListView().getWidth();
+                double fixedW = 24
+                        + 10
+                        + 10 + type.getWidth()
+                        + 10 + date.getWidth()
+                        + 40;
+                double availPx  = Math.max(listW - fixedW, 60);
+                int    maxChars = (int) (availPx / 7);
+
+                String shown = fullName.length() > maxChars
+                        ? fullName.substring(0, Math.max(maxChars - 1, 1)) + "…"
+                        : fullName;
+
+                if (search != null && !search.isBlank()) {
+                    String q  = search.toLowerCase();
+                    String lo = shown.toLowerCase();
+                    int idx   = lo.indexOf(q);
+
                     if (idx >= 0) {
-                        // до
-                        Text before = new Text(fullName.substring(0, idx));
-                        // совпавшая часть — Label с жёлтым фоном
-                        Label match = new Label(fullName.substring(idx, idx + q.length()));
-                        // смягчим немного
-                        match.setStyle("-fx-background-color: yellow; -fx-text-fill: black; -fx-background-radius: 6");
-                        // после
-                        Text after = new Text(fullName.substring(idx + q.length()));
+                        Text  before = new Text(shown.substring(0, idx));
+                        Label match  = new Label(shown.substring(idx, idx + q.length()));
+                        match.setStyle("-fx-background-color: yellow; -fx-background-radius: 4;");
+                        Text  after  = new Text(shown.substring(idx + q.length()));
                         nameFlow.getChildren().addAll(before, match, after);
                     } else {
-                        nameFlow.getChildren().add(new Text(fullName));
+                        nameFlow.getChildren().add(new Text(shown));
                     }
                 } else {
-                    nameFlow.getChildren().add(new Text(fullName));
+                    nameFlow.getChildren().add(new Text(shown));
                 }
 
-                // — остальные поля
                 type.setText(item.getType());
                 date.setText(item.getAddedAt().format(fmt));
 
@@ -311,7 +321,6 @@ public class ResourceManagerApp extends Application {
         lv.setPrefHeight(400);
         return lv;
     }
-
 
     /* ===================================================================== */
     /* === Right preview placeholder ====================================== */
