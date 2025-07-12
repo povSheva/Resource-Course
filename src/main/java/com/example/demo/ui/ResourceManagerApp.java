@@ -1,6 +1,7 @@
 package com.example.demo.ui;
 
 import com.example.demo.controllers.FilterController;
+import com.example.demo.controllers.OpenFileController;
 import com.example.demo.controllers.ResourceController;
 import com.example.demo.controllers.SearchController;
 import com.example.demo.dao.FileEntityDao;
@@ -35,6 +36,8 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
+import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import java.io.File;
 import java.net.URL;
@@ -59,6 +62,8 @@ public class ResourceManagerApp extends Application {
 
     private TextField searchField;
 
+    private OpenFileController opener;
+
     private double xOffset; // для перетаскивания окна
     private double yOffset;
 
@@ -73,17 +78,21 @@ public class ResourceManagerApp extends Application {
 
         HBox titleBar = buildTitleBar(primaryStage);
 
+        /* ---------- opener до построения UI ---------- */
+        Path repoRoot = Paths.get(System.getProperty("repo.root", "exports"));
+        opener = new OpenFileController(repoRoot, getHostServices());   // ← пишем в поле
+
         /* ---------- данные из сервиса ---------- */
         List<FileEntity> all = service.findAll();
         fileItems.setAll(all);
 
         /* ---------- контроллеры ---------- */
         FilterController filterController = new FilterController(fileItems);
-        searchController = new SearchController(filterController);
+        searchController                   = new SearchController(filterController);
 
         /* ---------- UI-layout ---------- */
-        BorderPane content = new BorderPane();                     // <-- объявляем СНАЧАЛА
-        content.setLeft  (buildLeftBar(filterController));         // передаём filterController
+        BorderPane content = new BorderPane();
+        content.setLeft  (buildLeftBar(filterController));
         content.setCenter(buildCenter());
         content.setRight (buildPreviewBox());
 
@@ -315,6 +324,15 @@ public class ResourceManagerApp extends Application {
                 date.setText(item.getAddedAt().format(fmt));
 
                 setGraphic(row);
+            }
+        });
+
+        lv.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                FileEntity sel = lv.getSelectionModel().getSelectedItem();
+                if (sel == null) return;
+                try { opener.open(sel); }
+                catch (Exception ex) { showError("Не удалось открыть файл", ex); }
             }
         });
 
