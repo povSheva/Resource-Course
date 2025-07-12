@@ -46,7 +46,9 @@ public class ResourceManagerApp extends Application {
     /* ===================================================================== */
     /* === Dependencies & State =========================================== */
 
-    private final FileEntityService service = new FileEntityService(new FileEntityDao());
+    private final FileEntityService service = new FileEntityService(
+            new FileEntityDao(),
+            System.getProperty("repo.root", "exports"));
     private final ObservableList<FileEntity> fileItems = FXCollections.observableArrayList();
 
     private double xOffset; // для перетаскивания окна

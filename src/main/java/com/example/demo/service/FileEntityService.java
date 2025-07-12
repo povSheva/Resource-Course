@@ -5,63 +5,110 @@ import com.example.demo.entity.FileEntity;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.*;
-import java.time.LocalDate;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public class FileEntityService {
+/**
+ * Сервис для работы с файлами без доп. метаданных.
+ * <p>
+ * Обеспечивает:
+ * 1) копирование файлов в репозиторий;
+ * 2) сохранение базовой информации через {@link FileEntityDao#save(FileEntity)};
+ * 3) получение списка файлов через {@link FileEntityDao#findAll()}.
+ */
+        public class FileEntityService {
 
-    private final FileEntityDao dao;
-    private final Path repoRoot = Paths.get("file_repo");   // вынесите в конфиг
+    /* =============================
+     * DAO
+     * ===========================*/
+    private final FileEntityDao fileDao;
 
-    public FileEntityService(FileEntityDao dao) {
-        this.dao = dao;
+    /* =============================
+     * Путь к корню репозитория
+     * ===========================*/
+    private final Path repoRoot;
+
+    /* =============================
+     * Конструктор
+     * ===========================*/
+    /**
+     * @param fileDao      DAO для таблицы files
+     * @param repoRootPath путь к корню репозитория
+     */
+    public FileEntityService(FileEntityDao fileDao, String repoRootPath) {
+        this.fileDao = fileDao;
+        this.repoRoot = Paths.get(repoRootPath);
     }
 
-    /** Вернуть все файлы из БД */
+    /* =============================
+     * Методы сервиса
+     * ===========================*/
+    /**
+     * Получить список всех файлов.
+     */
     public List<FileEntity> findAll() {
-        return dao.findAll();
+        return fileDao.findAll();
     }
 
-    /** Скопировать файл в репозиторий и сохранить метаданные */
+    /**
+     * Загрузить файл в репозиторий и сохранить запись в базе.
+     *
+     * @param src локальный файл-источник
+     * @return сохранённый FileEntity с заполненным uuid и addedAt
+     * @throws IOException при ошибке I/O
+     */
     public FileEntity uploadFile(File src) throws IOException {
-        // 1. генерируем storageKey
+        // 1) генерируем уникальный ключ хранения
         String key = generateStorageKey(src.getName());
 
+        // 2) копируем файл в репозиторий
         Path dst = repoRoot.resolve(key);
         Files.createDirectories(dst.getParent());
         Files.copy(src.toPath(), dst, StandardCopyOption.REPLACE_EXISTING);
 
-        // 2. собираем сущность
-        FileEntity f = new FileEntity();
-        f.setStorageKey(key);
-        f.setOrigName(src.getName());
-        f.setType(detectTypeByExtension(src));
-        f.setSizeBytes(src.length());
-        f.setAddedAt(LocalDate.now());
-        f.setUpdatedAt(LocalDate.now());
+        // 3) сохраняем базовые метаданные
+        FileEntity file = new FileEntity();
+        file.setStorageKey(dst.toAbsolutePath().toString());
+        file.setOrigName(src.getName());
+        file.setType(detectTypeByExtension(src.getName()));
+        file.setSizeBytes(src.length());
+        file.setAddedAt(LocalDateTime.now());
 
-        return dao.save(f);
+        return fileDao.save(file);
     }
 
-    /* ---------- утилиты -------------------------------------------------- */
-
+    /* =============================
+     * Вспомогательные методы
+     * ===========================*/
+    /**
+     * Генерирует storage key вида xx/yy/uuid.ext.
+     */
     private String generateStorageKey(String originalName) {
         String uuid = UUID.randomUUID().toString().replace('-', '0');
-        String ext  = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
-        return uuid.substring(0,2) + "/" + uuid.substring(2,4) + "/" + uuid + ext;
+        String ext = originalName.contains(".")
+                ? originalName.substring(originalName.lastIndexOf('.'))
+                : "";
+        return uuid.substring(0, 2) + "/"
+                + uuid.substring(2, 4) + "/"
+                + uuid + ext;
     }
 
-    private String detectTypeByExtension(File file) {
-        String ext = "";
-        int i = file.getName().lastIndexOf('.');
-        if (i >= 0) ext = file.getName().substring(i + 1).toLowerCase();
+    /**
+     * Определяет тип по расширению имени файла.
+     */
+    private String detectTypeByExtension(String fileName) {
+        int idx = fileName.lastIndexOf('.');
+        String ext = (idx >= 0) ? fileName.substring(idx + 1).toLowerCase() : "";
         return switch (ext) {
-            case "pdf"                    -> "PDF";
-            case "png", "jpg", "jpeg"     -> "Image";
-            case "doc", "docx"            -> "Docx";
-            default                       -> ext.toUpperCase();
+            case "pdf" -> "PDF";
+            case "png", "jpg", "jpeg" -> "Image";
+            case "doc", "docx" -> "Docx";
+            default -> ext.isEmpty() ? "" : ext.toUpperCase();
         };
     }
 }

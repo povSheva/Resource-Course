@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface CrudDao <E, ID> {
-    FileEntity save(FileEntity file);
+public interface CrudDao <E> {
+    E save(E e);
 
-    List<FileEntity> findAll();
+    List<E> findAll();
 
     //Optional<FileEntity> findById(UUID uuid);
 
