@@ -54,6 +54,8 @@ cd F:\MainProjDataDirection\Main\Resource-Course
 & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres -d demo
 
 
+Чтобы удаление работало, очисти все данные из бд и добавлй уже новые файлы!
+
 
 -- 1) Таблица «живых» файлов
 CREATE TABLE files (
