@@ -73,6 +73,8 @@ public class ResourceManagerApp extends Application {
 
     private SearchController searchController;
 
+    private ListView<FileEntity> fileListView;
+
     private TextField searchField;
 
     private OpenFileController opener;
@@ -307,10 +309,10 @@ public class ResourceManagerApp extends Application {
     }
 
     private ListView<FileEntity> createFileList() {
+
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         ListView<FileEntity> lv = new ListView<>(fileItems);
 
-        // стиль для выделения
         lv.getStylesheets().add(
                 getClass().getResource("/css/listview-custom.css")
                         .toExternalForm()
@@ -493,6 +495,7 @@ public class ResourceManagerApp extends Application {
         //lv.setPrefHeight(400);
 
         VBox.setVgrow(lv, Priority.ALWAYS);
+        fileListView = lv;
         return lv;
     }
 
@@ -612,11 +615,10 @@ public class ResourceManagerApp extends Application {
     }
 
     private FileEntity getSelectedFile() {
-        @SuppressWarnings("unchecked")
-        ListView<FileEntity> lv = (ListView<FileEntity>)
-                ((BorderPane)((VBox)forwardBtn.getScene().getRoot()).getChildren().get(1))
-                        .getCenter();
-        return lv.getSelectionModel().getSelectedItem();
+        if (fileListView != null) {
+            return fileListView.getSelectionModel().getSelectedItem();
+        }
+        return null;
     }
 
     private Parent getSceneRoot() {
