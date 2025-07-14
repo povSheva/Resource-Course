@@ -1,0 +1,17 @@
+.list-view .list-cell:filled:selected,
+.list-view .list-cell:filled:selected:hover {
+    -fx-background-color: transparent;
+}
+
+.file-row {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+
+.list-cell:selected .file-row {
+    -fx-border-color: #86bce9;  
+    -fx-border-width: 2;
+}

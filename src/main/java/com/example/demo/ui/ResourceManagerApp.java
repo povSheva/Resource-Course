@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 
+
 /**
  * JavaFX‑приложение для управления файлами.
  * <p>
@@ -195,32 +196,71 @@ public class ResourceManagerApp extends Application {
 
     private VBox buildLeftBar(FilterController filterCtrl) {
 
+        Label pinnedLabel = new Label("  Pinned");
+        pinnedLabel.setStyle("-fx-font-weight: bold;");
+        pinnedLabel.setTranslateY(6);
+
+        Separator sepPinned = new Separator();
+        sepPinned.setPrefWidth(220);
+        HBox sepPinnedWrapper = new HBox(sepPinned);
+        sepPinnedWrapper.setAlignment(Pos.CENTER);
+
         ListView<String> pinned = new ListView<>(FXCollections.observableArrayList(
-                "course-outline.pdf", "article-link"));
+                "course-outline.pdf", "article-link"
+        ));
         pinned.setMaxHeight(100);
+        pinned.setStyle(
+                "-fx-background-color: #FFFFFF;" +
+                        "-fx-background-radius: 8;" +
+                        "-fx-border-color: #E0E0E0;" +
+                        "-fx-border-radius: 8;"
+        );
 
         Button addBtn = new Button("+ Добавить ресурс");
-        addBtn.setMaxWidth(Double.MAX_VALUE);
+        addBtn.setMaxWidth(Region.USE_COMPUTED_SIZE);
         addBtn.setOnAction(e -> onAddResource());
+        HBox btnWrapper = new HBox(addBtn);
+        btnWrapper.setAlignment(Pos.CENTER);
+        btnWrapper.setPadding(new Insets(4, 0, 4, 0));
+
+        Separator sepAfterBtn = new Separator();
+        sepAfterBtn.setPrefWidth(220);
+        HBox sepAfterBtnWrapper = new HBox(sepAfterBtn);
+        sepAfterBtnWrapper.setAlignment(Pos.CENTER);
+
+        Label filterLabel = new Label("  Filters");
+        filterLabel.setStyle("-fx-font-weight: bold;");
+        filterLabel.setTranslateY(-2);
+
+        Separator sepAfterFilter = new Separator();
+        sepAfterFilter.setPrefWidth(220);
+        HBox sepAfterFilterWrapper = new HBox(sepAfterFilter);
+        sepAfterFilterWrapper.setAlignment(Pos.CENTER);
 
         VBox filterBox = new VBox(8);
         filterBox.setPadding(new Insets(8));
         filterBox.setMaxHeight(160);
-
-        filterCtrl.getTypeChecks().forEach((type, prop) -> {
-            filterBox.getChildren().add(makeRow(type, prop));
-        });
-
+        filterCtrl.getTypeChecks().forEach((type, prop) ->
+                filterBox.getChildren().add(makeRow(type, prop))
+        );
         filterCtrl.addTypeAddedListener(entry ->
-                Platform.runLater(() -> filterBox.getChildren().add(makeRow(entry.getKey(), entry.getValue())))
+                Platform.runLater(() ->
+                        filterBox.getChildren().add(makeRow(entry.getKey(), entry.getValue()))
+                )
         );
 
         return new VBox(10,
-                new Label("  Pinned"), pinned,
-                addBtn,
-                new Label("  Filter"), filterBox
+                pinnedLabel,
+                sepPinnedWrapper,
+                pinned,
+                btnWrapper,
+                sepAfterBtnWrapper,
+                filterLabel,
+                sepAfterFilterWrapper,
+                filterBox
         );
     }
+
 
     /** создаёт строку «текст  ––  чекбокс» и биндит property */
     private GridPane makeRow(String type, BooleanProperty prop) {
@@ -270,7 +310,14 @@ public class ResourceManagerApp extends Application {
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         ListView<FileEntity> lv = new ListView<>(fileItems);
 
+        // стиль для выделения
+        lv.getStylesheets().add(
+                getClass().getResource("/css/listview-custom.css")
+                        .toExternalForm()
+        );
+
         lv.setCellFactory(view -> new ListCell<>() {
+
             private final HBox row = new HBox(10);
             private final ImageView icon = new ImageView();
             private final TextFlow nameFlow = new TextFlow();
@@ -279,8 +326,14 @@ public class ResourceManagerApp extends Application {
             private final Button moreBtn = new Button("•••");
 
             {
+
+                row.getStyleClass().add("file-row");
+
                 icon.setFitWidth(24);
                 icon.setFitHeight(24);
+
+                type.setTextFill(Color.web("#374151"));
+                date.setTextFill(Color.web("#374151"));
 
                 moreBtn.setFocusTraversable(false);
                 moreBtn.setStyle("-fx-background-color: transparent; -fx-font-size: 16;");
@@ -288,14 +341,15 @@ public class ResourceManagerApp extends Application {
                 HBox.setHgrow(nameFlow, Priority.ALWAYS);
                 row.setAlignment(Pos.CENTER_LEFT);
                 row.setPadding(new Insets(8));
+
                 row.setStyle(
                         "-fx-background-color: #ffffff;" +
-                                "-fx-background-radius: 8;" +
-                                "-fx-border-radius: 8;" +
-                                "-fx-border-color: #e0e0e0;"
+                                "-fx-background-radius: 8;"
                 );
+
                 row.getChildren().addAll(icon, nameFlow, type, date, moreBtn);
             }
+
 
             @Override
             protected void updateItem(FileEntity item, boolean empty) {
@@ -392,7 +446,6 @@ public class ResourceManagerApp extends Application {
                                 }
                             });
                 });
-
                 setGraphic(row);
             }
         });
@@ -530,11 +583,11 @@ public class ResourceManagerApp extends Application {
         // 2) Описание
         FileAdditionalEntity meta = metaService.getOrCreateMetadata(file.getUuid());
         String info = meta.getAdditionalInfo();
-        previewDesc.getChildren().setAll(new Text(info != null && !info.isBlank() ? info : "—"));
+        previewDesc.getChildren().setAll(new Text(info != null && !info.isBlank() ? info : "нет описания..."));
 
         // 3) Тег и дата над линией
         String tag = meta.getTag();
-        previewTag.setText("Тег: " + (tag != null && !tag.isBlank() ? tag : "—"));
+        previewTag.setText("Тег: " + (tag != null && !tag.isBlank() ? tag : "без тега"));
 
         String formattedDate = meta.getUpdatedAt()
                 .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
