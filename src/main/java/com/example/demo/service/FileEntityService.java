@@ -5,110 +5,88 @@ import com.example.demo.entity.FileEntity;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDateTime;
+import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Сервис для работы с файлами без доп. метаданных.
- * <p>
- * Обеспечивает:
- * 1) копирование файлов в репозиторий;
- * 2) сохранение базовой информации через {@link FileEntityDao#save(FileEntity)};
- * 3) получение списка файлов через {@link FileEntityDao#findAll()}.
+ * Сервис для работы с основными файлами (таблица files + файловая система).
  */
-        public class FileEntityService {
+public class FileEntityService {
 
-    /* =============================
-     * DAO
-     * ===========================*/
     private final FileEntityDao fileDao;
-
-    /* =============================
-     * Путь к корню репозитория
-     * ===========================*/
     private final Path repoRoot;
 
-    /* =============================
-     * Конструктор
-     * ===========================*/
     /**
-     * @param fileDao      DAO для таблицы files
-     * @param repoRootPath путь к корню репозитория
+     * @param fileDao   DAO для таблицы files
+     * @param repoRoot  путь к корневой папке хранения (строка)
      */
-    public FileEntityService(FileEntityDao fileDao, String repoRootPath) {
+    public FileEntityService(FileEntityDao fileDao, String repoRoot) {
         this.fileDao = fileDao;
-        this.repoRoot = Paths.get(repoRootPath);
+        this.repoRoot = Paths.get(repoRoot);
+        try {
+            Files.createDirectories(this.repoRoot);
+        } catch (IOException e) {
+            throw new RuntimeException("Не удалось создать папку репозитория: " + this.repoRoot, e);
+        }
     }
 
-    /* =============================
-     * Методы сервиса
-     * ===========================*/
-    /**
-     * Получить список всех файлов.
-     */
+    /** Список всех файлов (без метаданных). */
     public List<FileEntity> findAll() {
         return fileDao.findAll();
     }
 
     /**
-     * Загрузить файл в репозиторий и сохранить запись в базе.
-     *
-     * @param src локальный файл-источник
-     * @return сохранённый FileEntity с заполненным uuid и addedAt
-     * @throws IOException при ошибке I/O
+     * Загружает файл в репозиторий:
+     * - копирует в папку repoRoot,
+     * - сохраняет запись в БД,
+     * - возвращает сохранённую сущность с установленным UUID и addedAt.
      */
-    public FileEntity uploadFile(File src) throws IOException {
-        // 1) генерируем уникальный ключ хранения
-        String key = generateStorageKey(src.getName());
+    public FileEntity uploadFile(File source) {
+        // Генерируем уникальный storageKey
+        String storageKey = UUID.randomUUID() + "_" + source.getName();
+        Path dest = repoRoot.resolve(storageKey);
 
-        // 2) копируем файл в репозиторий
-        Path dst = repoRoot.resolve(key);
-        Files.createDirectories(dst.getParent());
-        Files.copy(src.toPath(), dst, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            Files.copy(source.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Не удалось скопировать файл в репозиторий", e);
+        }
 
-        // 3) сохраняем базовые метаданные
-        FileEntity file = new FileEntity();
-        file.setStorageKey(dst.toAbsolutePath().toString());
-        file.setOrigName(src.getName());
-        file.setType(detectTypeByExtension(src.getName()));
-        file.setSizeBytes(src.length());
-        file.setAddedAt(LocalDateTime.now());
+        // Подготовка и сохранение в БД
+        FileEntity entity = new FileEntity();
+        entity.setStorageKey(storageKey);
+        entity.setOrigName(source.getName());
+        entity.setType(detectType(source.getName()));
+        entity.setSizeBytes(source.length());
 
-        return fileDao.save(file);
-    }
-
-    /* =============================
-     * Вспомогательные методы
-     * ===========================*/
-    /**
-     * Генерирует storage key вида xx/yy/uuid.ext.
-     */
-    private String generateStorageKey(String originalName) {
-        String uuid = UUID.randomUUID().toString().replace('-', '0');
-        String ext = originalName.contains(".")
-                ? originalName.substring(originalName.lastIndexOf('.'))
-                : "";
-        return uuid.substring(0, 2) + "/"
-                + uuid.substring(2, 4) + "/"
-                + uuid + ext;
+        return fileDao.save(entity);
     }
 
     /**
-     * Определяет тип по расширению имени файла.
+     * Удаляет файл и запись:
+     * - сперва удаляем сам файл с диска,
+     * - затем строку из таблицы files.
      */
-    private String detectTypeByExtension(String fileName) {
-        int idx = fileName.lastIndexOf('.');
-        String ext = (idx >= 0) ? fileName.substring(idx + 1).toLowerCase() : "";
-        return switch (ext) {
-            case "pdf" -> "PDF";
-            case "png", "jpg", "jpeg" -> "Image";
-            case "doc", "docx" -> "Docx";
-            default -> ext.isEmpty() ? "" : ext.toUpperCase();
-        };
+    public void deleteFile(UUID fileUuid) {
+        // Сначала получаем данные о файле, чтобы знать storageKey
+        FileEntity f = fileDao.findById(fileUuid)
+                .orElseThrow(() -> new RuntimeException("Файл не найден: " + fileUuid));
+
+        // Удаляем с диска
+        try {
+            Files.deleteIfExists(repoRoot.resolve(f.getStorageKey()));
+        } catch (IOException e) {
+            throw new RuntimeException("Не удалось удалить файл с диска", e);
+        }
+
+        // Удаляем из БД
+        fileDao.deleteById(fileUuid);
+    }
+
+    /** Примитивное определение типа по расширению файла. */
+    private String detectType(String filename) {
+        int idx = filename.lastIndexOf('.');
+        return idx >= 0 ? filename.substring(idx + 1).toUpperCase() : "UNKNOWN";
     }
 }

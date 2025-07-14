@@ -4,8 +4,11 @@ import com.example.demo.controllers.FilterController;
 import com.example.demo.controllers.OpenFileController;
 import com.example.demo.controllers.ResourceController;
 import com.example.demo.controllers.SearchController;
+import com.example.demo.dao.FileAdditionalDao;
 import com.example.demo.dao.FileEntityDao;
+import com.example.demo.entity.FileAdditionalEntity;
 import com.example.demo.entity.FileEntity;
+import com.example.demo.service.FileAdditionalEntityService;
 import com.example.demo.service.FileEntityService;
 import javafx.animation.*;
 import javafx.application.Application;
@@ -19,6 +22,7 @@ import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -41,9 +45,11 @@ import java.nio.file.Path;
 
 import java.io.File;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Stream;
+
 
 /**
  * JavaFX‑приложение для управления файлами.
@@ -53,9 +59,13 @@ import java.util.stream.Stream;
  */
 public class ResourceManagerApp extends Application {
 
-    private final FileEntityService service = new FileEntityService(
-            new FileEntityDao(),
-            System.getProperty("repo.root", "exports"));
+    private final FileEntityService fileService =
+            new FileEntityService(
+                    new FileEntityDao(),
+                    System.getProperty("repo.root", "exports")
+            );
+    private final FileAdditionalEntityService metaService =
+            new FileAdditionalEntityService(new FileAdditionalDao());
     private final ObservableList<FileEntity> fileItems = FXCollections.observableArrayList();
 
     private SearchController searchController;
@@ -63,6 +73,15 @@ public class ResourceManagerApp extends Application {
     private TextField searchField;
 
     private OpenFileController opener;
+
+    // Preview-area controls (правый блок)
+    private Label      previewTitle;
+    private TextFlow   previewDesc;
+    private Label      previewTag;
+    private Label      previewDate;
+    private Button     forwardBtn;
+    private ToggleButton pinBtn;
+    private Button     deleteBtn;
 
     private double xOffset; // для перетаскивания окна
     private double yOffset;
@@ -83,7 +102,7 @@ public class ResourceManagerApp extends Application {
         opener = new OpenFileController(repoRoot, getHostServices());   // ← пишем в поле
 
         /* ---------- данные из сервиса ---------- */
-        List<FileEntity> all = service.findAll();
+        List<FileEntity> all = fileService.findAll();
         fileItems.setAll(all);
 
         /* ---------- контроллеры ---------- */
@@ -145,7 +164,7 @@ public class ResourceManagerApp extends Application {
         exportBtn.setStyle("-fx-background-color: #f9fafb; -fx-background-radius: 8; " +
                 "-fx-font-size: 15px; -fx-font-family: 'Inter Semibold'; -fx-font-weight: 600; " +
                 "-fx-text-fill: #0f1113; -fx-padding: 6 32; -fx-border-color: transparent;");
-        exportBtn.setOnAction(new ResourceController(service, fileItems)::onExportClick);
+        exportBtn.setOnAction(new ResourceController(fileService, fileItems)::onExportClick);
 
         Region leftSpacer  = new Region();
         Region rightSpacer = new Region();
@@ -232,6 +251,11 @@ public class ResourceManagerApp extends Application {
 
     private VBox buildCenter() {
         ListView<FileEntity> listView = createFileList();
+        listView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null) clearPreview();
+            else showPreview(newVal);
+        });
+
         Label status = new Label();
         status.textProperty().bind(Bindings.size(fileItems).asString("%d записей"));
 
@@ -241,39 +265,45 @@ public class ResourceManagerApp extends Application {
     }
 
     private ListView<FileEntity> createFileList() {
-
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         ListView<FileEntity> lv = new ListView<>(fileItems);
 
         lv.setCellFactory(view -> new ListCell<>() {
-
-            private final HBox  row   = new HBox(10);
+            private final HBox row = new HBox(10);
             private final ImageView icon = new ImageView();
             private final TextFlow nameFlow = new TextFlow();
             private final Label type = new Label();
             private final Label date = new Label();
+            private final Button moreBtn = new Button("•••");
 
             {
                 icon.setFitWidth(24);
                 icon.setFitHeight(24);
 
+                moreBtn.setFocusTraversable(false);
+                moreBtn.setStyle("-fx-background-color: transparent; -fx-font-size: 16;");
+
                 HBox.setHgrow(nameFlow, Priority.ALWAYS);
                 row.setAlignment(Pos.CENTER_LEFT);
                 row.setPadding(new Insets(8));
-                row.setStyle("""
-                    -fx-background-color: #ffffff;
-                    -fx-background-radius: 8;
-                    -fx-border-radius: 8;
-                    -fx-border-color: #e0e0e0;
-                    """);
-                row.getChildren().addAll(icon, nameFlow, type, date);
+                row.setStyle(
+                        "-fx-background-color: #ffffff;" +
+                                "-fx-background-radius: 8;" +
+                                "-fx-border-radius: 8;" +
+                                "-fx-border-color: #e0e0e0;"
+                );
+                row.getChildren().addAll(icon, nameFlow, type, date, moreBtn);
             }
 
             @Override
             protected void updateItem(FileEntity item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) { setGraphic(null); return; }
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
 
+                // Иконка по типу
                 URL resUrl = getClass().getResource(switch (item.getType().toUpperCase()) {
                     case "PDF"   -> "/images/pdf.png";
                     case "IMAGE" -> "/images/image.png";
@@ -281,23 +311,13 @@ public class ResourceManagerApp extends Application {
                 });
                 icon.setImage(resUrl != null ? new Image(resUrl.toExternalForm()) : null);
 
-                /* я крч столкнулся с проблемой, если название большое то оно
-                 выталкивает все остальное за границы,
-                 вот фикс(адаптивоне ограничение размеров) */
-
+                // Текст с обрезкой и подсветкой
                 nameFlow.getChildren().clear();
                 String fullName = item.getOrigName();
                 String search   = searchField.getText();
-
-                double listW  = getListView().getWidth();
-                double fixedW = 24
-                        + 10
-                        + 10 + type.getWidth()
-                        + 10 + date.getWidth()
-                        + 40;
-                double availPx  = Math.max(listW - fixedW, 60);
-                int    maxChars = (int) (availPx / 7);
-
+                double listW    = getListView().getWidth();
+                double fixedW   = 24 + 10 + type.getWidth() + 10 + date.getWidth() + 40;
+                int    maxChars = (int) (Math.max(listW - fixedW, 60) / 7);
                 String shown = fullName.length() > maxChars
                         ? fullName.substring(0, Math.max(maxChars - 1, 1)) + "…"
                         : fullName;
@@ -306,12 +326,11 @@ public class ResourceManagerApp extends Application {
                     String q  = search.toLowerCase();
                     String lo = shown.toLowerCase();
                     int idx   = lo.indexOf(q);
-
                     if (idx >= 0) {
-                        Text  before = new Text(shown.substring(0, idx));
-                        Label match  = new Label(shown.substring(idx, idx + q.length()));
+                        Text before = new Text(shown.substring(0, idx));
+                        Label match = new Label(shown.substring(idx, idx + q.length()));
                         match.setStyle("-fx-background-color: yellow; -fx-background-radius: 4;");
-                        Text  after  = new Text(shown.substring(idx + q.length()));
+                        Text after  = new Text(shown.substring(idx + q.length()));
                         nameFlow.getChildren().addAll(before, match, after);
                     } else {
                         nameFlow.getChildren().add(new Text(shown));
@@ -323,6 +342,55 @@ public class ResourceManagerApp extends Application {
                 type.setText(item.getType());
                 date.setText(item.getAddedAt().format(fmt));
 
+                // Обработчик кнопки «•••» — редактирование тега и доп. информации
+                moreBtn.setOnAction(evt -> {
+                    Dialog<FileAdditionalEntity> dlg = new Dialog<>();
+                    dlg.setTitle("Редактировать метаданные");
+                    ButtonType saveBtn = new ButtonType("Сохранить", ButtonBar.ButtonData.OK_DONE);
+                    dlg.getDialogPane().getButtonTypes().addAll(saveBtn, ButtonType.CANCEL);
+
+                    TextField tagInput = new TextField();
+                    tagInput.setPromptText("Tag");
+                    TextArea infoInput = new TextArea();
+                    infoInput.setPromptText("Additional info");
+                    infoInput.setPrefRowCount(4);
+
+                    // Загружаем или создаём метаданные
+                    FileAdditionalEntity existing = metaService.getOrCreateMetadata(item.getUuid());
+                    tagInput.setText(existing.getTag());
+                    infoInput.setText(existing.getAdditionalInfo());
+
+                    GridPane grid = new GridPane();
+                    grid.setHgap(10);
+                    grid.setVgap(10);
+                    grid.add(new Label("Tag:"), 0, 0);
+                    grid.add(tagInput,        1, 0);
+                    grid.add(new Label("Info:"),0, 1);
+                    grid.add(infoInput,       1, 1);
+                    dlg.getDialogPane().setContent(grid);
+
+                    dlg.setResultConverter(button -> {
+                        if (button == saveBtn) {
+                            existing.setTag(tagInput.getText());
+                            existing.setAdditionalInfo(infoInput.getText());
+                            existing.setUpdatedAt(LocalDateTime.now());
+                            return existing;
+                        }
+                        return null;
+                    });
+
+                    dlg.showAndWait()
+                            .filter(meta -> meta != null)
+                            .ifPresent(meta -> {
+                                metaService.saveMetadata(meta);
+                                // если этот файл сейчас выбран — обновляем превью
+                                FileEntity sel = getSelectedFile();
+                                if (sel != null && sel.getUuid().equals(item.getUuid())) {
+                                    showPreview(item);
+                                }
+                            });
+                });
+
                 setGraphic(row);
             }
         });
@@ -331,8 +399,11 @@ public class ResourceManagerApp extends Application {
             if (e.getClickCount() == 2) {
                 FileEntity sel = lv.getSelectionModel().getSelectedItem();
                 if (sel == null) return;
-                try { opener.open(sel); }
-                catch (Exception ex) { showError("Не удалось открыть файл", ex); }
+                try {
+                    opener.open(sel);
+                } catch (Exception ex) {
+                    showError("Не удалось открыть файл", ex);
+                }
             }
         });
 
@@ -340,24 +411,133 @@ public class ResourceManagerApp extends Application {
         return lv;
     }
 
-    /* ===================================================================== */
-    /* === Right preview placeholder ====================================== */
-
     private VBox buildPreviewBox() {
-        Label title = new Label("Course Outline");
-        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-        Label desc = new Label("An overview of the course content, including topics, objectives, and evaluation methods.");
-        desc.setWrapText(true);
-        HBox actions = new HBox(10, new Button("⭳"), new Button("🔖"));
+        // 1) Заголовок
+        previewTitle = new Label();
+        previewTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
 
-        VBox box = new VBox(10, title, desc, new Separator(), actions);
-        box.setPadding(new Insets(10));
-        box.setPrefWidth(250);
+        // 2) Описание (additionalInfo)
+        previewDesc = new TextFlow();
+        previewDesc.setPrefWidth(260);
+        previewDesc.setLineSpacing(4);
+
+        // 3) Метаданные: Тег + Дата
+        previewTag  = new Label();
+        previewDate = new Label();
+        previewTag.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 12px;");
+        previewDate.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 12px;");
+
+        HBox metaBox = new HBox(20, previewTag, previewDate);
+        metaBox.setAlignment(Pos.CENTER_LEFT);
+
+        // 4) Спэйсер, чтобы линия и кнопки были прижаты к низу
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        // 5) Разделительная линия
+        Separator sep = new Separator();
+
+        // 6) Кнопки действий
+        forwardBtn = new Button("Переслать");
+        forwardBtn.setDisable(true);
+        forwardBtn.setOnAction(e -> {
+            // TODO: логика пересылки
+        });
+
+        pinBtn = new ToggleButton("🔖");
+        pinBtn.setDisable(true);
+        pinBtn.setOnAction(e -> {
+            FileEntity sel = getSelectedFile();
+            if (sel != null) {
+                var meta = metaService.getOrCreateMetadata(sel.getUuid());
+                meta.setPinned(pinBtn.isSelected());
+                meta.setUpdatedAt(LocalDateTime.now());
+                metaService.saveMetadata(meta);
+            }
+        });
+
+        deleteBtn = new Button("✖");
+        deleteBtn.setDisable(true);
+        deleteBtn.setOnAction(e -> {
+            FileEntity sel = getSelectedFile();
+            if (sel != null) {
+                fileService.deleteFile(sel.getUuid());
+                fileItems.remove(sel);
+                clearPreview();
+            }
+        });
+
+        HBox actions = new HBox(10, forwardBtn, pinBtn, deleteBtn);
+        actions.setAlignment(Pos.CENTER);
+
+        // 7) Собираем всё в VBox
+        VBox box = new VBox(10,
+                previewTitle,
+                previewDesc,
+                metaBox,
+                spacer,
+                sep,
+                actions
+        );
+        box.setPadding(new Insets(16));
+        box.setPrefWidth(300);
+        box.setStyle(
+                "-fx-background-color: #FFFFFF;" +
+                        "-fx-background-radius: 8;" +
+                        "-fx-border-radius: 8;" +
+                        "-fx-border-color: #E0E0E0;"
+        );
+
         return box;
     }
 
-    /* ===================================================================== */
-    /* === Add resource flow ============================================== */
+    private void showPreview(FileEntity file) {
+        // 1) Заголовок
+        previewTitle.setText(file.getOrigName());
+
+        // 2) Описание
+        FileAdditionalEntity meta = metaService.getOrCreateMetadata(file.getUuid());
+        String info = meta.getAdditionalInfo();
+        previewDesc.getChildren().setAll(new Text(info != null && !info.isBlank() ? info : "—"));
+
+        // 3) Тег и дата над линией
+        String tag = meta.getTag();
+        previewTag.setText("Тег: " + (tag != null && !tag.isBlank() ? tag : "—"));
+
+        String formattedDate = meta.getUpdatedAt()
+                .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+        previewDate.setText("Обновлён: " + formattedDate);
+
+        // 4) Включаем кнопки
+        forwardBtn.setDisable(false);
+        pinBtn.setDisable(false);
+        pinBtn.setSelected(meta.isPinned());
+        deleteBtn.setDisable(false);
+    }
+
+    private void clearPreview() {
+        previewTitle.setText("");
+        previewDesc.getChildren().clear();
+        previewTag.setText("");
+        previewDate.setText("");
+        forwardBtn.setDisable(true);
+        pinBtn.setDisable(true);
+        pinBtn.setSelected(false);
+        deleteBtn.setDisable(true);
+    }
+
+    private FileEntity getSelectedFile() {
+        @SuppressWarnings("unchecked")
+        ListView<FileEntity> lv = (ListView<FileEntity>)
+                ((BorderPane)((VBox)forwardBtn.getScene().getRoot()).getChildren().get(1))
+                        .getCenter();
+        return lv.getSelectionModel().getSelectedItem();
+    }
+
+    private Parent getSceneRoot() {
+        return forwardBtn.getScene().getRoot();
+    }
+
 
     private void onAddResource() {
         FileChooser chooser = new FileChooser();
@@ -365,8 +545,8 @@ public class ResourceManagerApp extends Application {
         if (file == null) return;
 
         try {
-            FileEntity saved = service.uploadFile(file); // сохраняет файл + метадату
-            // 4) Добавляем через SearchController, чтобы оба списка остались синхронизированы
+            // вместо service.uploadFile → fileService.uploadFile
+            FileEntity saved = fileService.uploadFile(file);
             searchController.onAddNew(saved);
         } catch (Exception ex) {
             showError("Не удалось добавить файл", ex);
