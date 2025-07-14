@@ -20,8 +20,10 @@ import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -214,9 +216,9 @@ public class ResourceManagerApp extends Application {
         );
 
         return new VBox(10,
-                new Label("Pinned"), pinned,
+                new Label("  Pinned"), pinned,
                 addBtn,
-                new Label("Filter"), filterBox
+                new Label("  Filter"), filterBox
         );
     }
 
@@ -317,7 +319,7 @@ public class ResourceManagerApp extends Application {
                 String search   = searchField.getText();
                 double listW    = getListView().getWidth();
                 double fixedW   = 24 + 10 + type.getWidth() + 10 + date.getWidth() + 40;
-                int    maxChars = (int) (Math.max(listW - fixedW, 60) / 7);
+                int maxChars = (int) (Math.max(listW - fixedW, 60) / 7) - 8;
                 String shown = fullName.length() > maxChars
                         ? fullName.substring(0, Math.max(maxChars - 1, 1)) + "…"
                         : fullName;
@@ -395,6 +397,14 @@ public class ResourceManagerApp extends Application {
             }
         });
 
+        // это скругнение главного списка файлов
+        lv.setStyle(
+                "-fx-background-color: #FFFFFF;" +
+                        "-fx-background-radius: 8;" +
+                        "-fx-border-color: #E0E0E0;" +
+                        "-fx-border-radius: 8;"
+        );
+
         lv.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 FileEntity sel = lv.getSelectionModel().getSelectedItem();
@@ -407,7 +417,29 @@ public class ResourceManagerApp extends Application {
             }
         });
 
-        lv.setPrefHeight(400);
+        lv.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+            Platform.runLater(() -> {
+                for (Node node : lv.lookupAll(".scroll-bar")) {
+                    if (node instanceof ScrollBar sb &&
+                            sb.getOrientation() == Orientation.HORIZONTAL) {
+                        sb.setVisible(false);
+                        sb.setManaged(false);
+                    }
+                }
+                lv.refresh();
+            });
+        });
+
+
+        // тут крч скрываем нижний скролл у таблицы
+        lv.getStylesheets().add(
+                getClass().getResource("/css/no-h-scroll.css")
+                        .toExternalForm()
+        );
+
+        //lv.setPrefHeight(400);
+
+        VBox.setVgrow(lv, Priority.ALWAYS);
         return lv;
     }
 

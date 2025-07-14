@@ -1,0 +1,6 @@
+.list-view .scroll-bar:horizontal {
+    -fx-max-height: 0px;
+    -fx-min-height: 0px;
+    -fx-pref-height: 0px;
+    -fx-opacity: 0;
+}
