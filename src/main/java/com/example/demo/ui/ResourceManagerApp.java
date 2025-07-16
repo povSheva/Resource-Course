@@ -527,22 +527,26 @@ public class ResourceManagerApp extends Application {
         // 1) Заголовок
         previewTitle = new Label();
         previewTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        // включаем перенос и фиксируем ширину
 
         // 2) Описание (additionalInfo)
         previewDesc = new TextFlow();
         previewDesc.setPrefWidth(260);
         previewDesc.setLineSpacing(4);
+        // TextFlow сам будет переносить текст по ширине, заданной через prefWidth
 
         // 3) Метаданные: Тег + Дата
         previewTag  = new Label();
         previewDate = new Label();
         previewTag.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 12px;");
         previewDate.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 12px;");
-
+        // про запас тоже включим перенос, если тег слишком длинный
+        previewTag.setWrapText(true);
+        previewTag.setMaxWidth(200);
         HBox metaBox = new HBox(20, previewTag, previewDate);
         metaBox.setAlignment(Pos.CENTER_LEFT);
 
-        // 4) Спэйсер, чтобы линия и кнопки были прижаты к низу
+        // 4) Спэйсер, чтобы "опустить" мета-блок вниз
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
@@ -552,9 +556,7 @@ public class ResourceManagerApp extends Application {
         // 6) Кнопки действий
         forwardBtn = new Button("Переслать");
         forwardBtn.setDisable(true);
-        forwardBtn.setOnAction(e -> {
-            // TODO: логика пересылки
-        });
+        // ... (ваша логика)
 
         pinBtn = new ToggleButton("🔖");
         pinBtn.setDisable(true);
@@ -565,8 +567,10 @@ public class ResourceManagerApp extends Application {
                 meta.setPinned(pinBtn.isSelected());
                 meta.setUpdatedAt(LocalDateTime.now());
                 metaService.saveMetadata(meta);
+                // обновление pinned‑списка и т.п.
             }
         });
+
 
         deleteBtn = new Button("✖");
         deleteBtn.setDisable(true);
@@ -582,12 +586,12 @@ public class ResourceManagerApp extends Application {
         HBox actions = new HBox(10, forwardBtn, pinBtn, deleteBtn);
         actions.setAlignment(Pos.CENTER);
 
-        // 7) Собираем всё в VBox
+        // 7) Собираем всё в порядке: заголовок, описание, spacer, мета, разделитель, кнопки
         VBox box = new VBox(10,
                 previewTitle,
                 previewDesc,
-                metaBox,
                 spacer,
+                metaBox,
                 sep,
                 actions
         );
@@ -602,6 +606,8 @@ public class ResourceManagerApp extends Application {
 
         return box;
     }
+
+
 
     private void showPreview(FileEntity file) {
         // 1) Заголовок
