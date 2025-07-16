@@ -12,25 +12,26 @@ import javafx.stage.FileChooser;
 import java.io.File;
 
 /**
- * Контроллер кнопки «Import / Export». Работает через {@link FileEntityService}:
- * сервис сам копирует файл в репозиторий, рассчитывает {@code storageKey}
- * и сохраняет метаданные в БД.
+ * Контроллер кнопки «Import / Export». Теперь уведомляет FilterController
+ * о каждом новом файле, чтобы адаптивно обновлять фильтры.
  */
 public class ResourceController {
 
     private final FileEntityService service;
     private final ObservableList<FileEntity> uiList;
+    private final FilterController filterController;
 
     public ResourceController(FileEntityService service,
-                              ObservableList<FileEntity> uiList) {
-        this.service = service;
-        this.uiList  = uiList;
+                              ObservableList<FileEntity> uiList,
+                              FilterController filterController) {
+        this.service          = service;
+        this.uiList           = uiList;
+        this.filterController = filterController;
     }
 
     @FXML
     public void onExportClick(ActionEvent event) {
-
-        /* ---------- диалог выбора файла -------------------------------- */
+        // 1) Показываем диалог выбора файла
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Выберите файл для импорта");
         chooser.getExtensionFilters().addAll(
@@ -46,15 +47,20 @@ public class ResourceController {
         );
         if (selected == null) return;
 
-        /* ---------- фон: копирование файла + запись в БД --------------- */
+        // 2) Фон: копируем файл и сохраняем в БД
         Task<FileEntity> uploadTask = new Task<>() {
-            @Override protected FileEntity call() throws Exception {
+            @Override
+            protected FileEntity call() throws Exception {
                 return service.uploadFile(selected);
             }
         };
 
-        /* ---------- UI-поток: обновляем список -------------------------- */
-        uploadTask.setOnSucceeded(e -> uiList.add(0, uploadTask.getValue()));
+        // 3) UI-поток: вставляем в список и уведомляем фильтры
+        uploadTask.setOnSucceeded(e -> {
+            FileEntity newFile = uploadTask.getValue();
+            uiList.add(0, newFile);
+            filterController.onAddNew(newFile);
+        });
         uploadTask.setOnFailed(e -> uploadTask.getException().printStackTrace());
 
         new Thread(uploadTask, "file-upload-task").start();

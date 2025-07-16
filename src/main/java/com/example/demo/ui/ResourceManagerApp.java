@@ -10,6 +10,7 @@ import com.example.demo.entity.FileAdditionalEntity;
 import com.example.demo.entity.FileEntity;
 import com.example.demo.service.FileAdditionalEntityService;
 import com.example.demo.service.FileEntityService;
+import java.util.HashMap;
 import javafx.animation.*;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -50,6 +51,7 @@ import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 
@@ -77,6 +79,8 @@ public class ResourceManagerApp extends Application {
 
     private ListView<FileEntity> fileListView;
 
+    private FilterController filterCtrl;
+
     private TextField searchField;
 
     private OpenFileController opener;
@@ -102,9 +106,6 @@ public class ResourceManagerApp extends Application {
     public void start(Stage primaryStage) {
         primaryStage.initStyle(StageStyle.TRANSPARENT);
 
-        // Заголовок с кнопками управления окном
-        HBox titleBar = buildTitleBar(primaryStage);
-
         // Открывалка файлов
         Path repoRoot = Paths.get(System.getProperty("repo.root", "exports"));
         opener = new OpenFileController(repoRoot, getHostServices());
@@ -119,14 +120,16 @@ public class ResourceManagerApp extends Application {
                 .forEach(pinnedItems::add);
 
         // Контроллеры для фильтрации и поиска
-        FilterController filterController = new FilterController(fileItems);
-        searchController = new SearchController(filterController);
+        filterCtrl       = new FilterController(fileItems);
+        searchController = new SearchController(filterCtrl);
+
+        HBox titleBar = buildTitleBar(primaryStage);
 
         // Собираем основной контент
         BorderPane content = new BorderPane();
-        content.setLeft(buildLeftBar(filterController));  // слева – pinned + фильтры
-        content.setCenter(buildCenter());                 // центр – список файлов
-        content.setRight(buildPreviewBox());              // справа – превью + кнопки
+        content.setLeft(buildLeftBar(filterCtrl));
+        content.setCenter(buildCenter());
+        content.setRight(buildPreviewBox());
 
         // Округлённое окно
         VBox root = wrapWithRoundedWindow(titleBar, content);
@@ -178,7 +181,10 @@ public class ResourceManagerApp extends Application {
         exportBtn.setStyle("-fx-background-color: #f9fafb; -fx-background-radius: 8; " +
                 "-fx-font-size: 15px; -fx-font-family: 'Inter Semibold'; -fx-font-weight: 600; " +
                 "-fx-text-fill: #0f1113; -fx-padding: 6 32; -fx-border-color: transparent;");
-        exportBtn.setOnAction(new ResourceController(fileService, fileItems)::onExportClick);
+
+        ResourceController resCtrl = new ResourceController(fileService, fileItems, filterCtrl);
+
+        exportBtn.setOnAction(resCtrl::onExportClick);
 
         Region leftSpacer  = new Region();
         Region rightSpacer = new Region();
@@ -266,19 +272,36 @@ public class ResourceManagerApp extends Application {
         VBox filterBox = new VBox(8);
         filterBox.setPadding(new Insets(8));
         filterBox.setMaxHeight(160);
-        filterCtrl.getTypeChecks().forEach((type, prop) ->
-                filterBox.getChildren().add(makeRow(type, prop))
-        );
-        filterCtrl.addTypeAddedListener(entry ->
-                Platform.runLater(() ->
-                        filterBox.getChildren().add(makeRow(entry.getKey(), entry.getValue()))
-                )
-        );
+
+        // Для удаления строк по типу
+        Map<String, Node> rowMap = new HashMap<>();
+
+        // Изначальные фильтры
+        filterCtrl.getTypeChecks().forEach((type, prop) -> {
+            GridPane row = makeRow(type, prop);
+            rowMap.put(type, row);
+            filterBox.getChildren().add(row);
+        });
+
+        // Когда добавляется новый тип
+        filterCtrl.addTypeAddedListener(entry -> Platform.runLater(() -> {
+            String type = entry.getKey();
+            BooleanProperty prop = entry.getValue();
+            GridPane row = makeRow(type, prop);
+            rowMap.put(type, row);
+            filterBox.getChildren().add(row);
+        }));
+
+        // Когда тип «умирает»
+        filterCtrl.addTypeRemovedListener(type -> Platform.runLater(() -> {
+            Node row = rowMap.remove(type);
+            if (row != null) filterBox.getChildren().remove(row);
+        }));
 
         return new VBox(10,
                 pinnedLabel,
                 sepPinnedWrapper,
-                pinnedList,     // ← сюда
+                pinnedList,
                 btnWrapper,
                 sepAfterBtnWrapper,
                 filterLabel,
@@ -578,10 +601,12 @@ public class ResourceManagerApp extends Application {
             FileEntity sel = getSelectedFile();
             if (sel != null) {
                 fileService.deleteFile(sel.getUuid());
+                filterCtrl.onRemove(sel);
                 fileItems.remove(sel);
                 clearPreview();
             }
         });
+
 
         HBox actions = new HBox(10, forwardBtn, pinBtn, deleteBtn);
         actions.setAlignment(Pos.CENTER);

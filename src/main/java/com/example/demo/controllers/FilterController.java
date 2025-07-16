@@ -3,6 +3,7 @@ package com.example.demo.controllers;
 import com.example.demo.entity.FileEntity;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 
 import java.util.*;
@@ -12,44 +13,52 @@ import java.util.stream.Collectors;
 
 /** Централизованная фильтрация: типы + текстовый поиск. */
 public class FilterController {
-
     private final ObservableList<FileEntity> view;
     private final List<FileEntity> masterCopy;
 
+    // 1) Сколько файлов каждого типа «на полке»
+    private final Map<String, Integer> typeUsage = new HashMap<>();
+
+    // 2) Свойства для чек-боксов
     private final Map<String, BooleanProperty> typeChecks = new LinkedHashMap<>();
 
-
-
     private Predicate<FileEntity> typePredicate = f -> true;
-
-    // ---------- текстовый поиск ----------
     private Predicate<FileEntity> searchPredicate = f -> true;
 
-    // слушатели, которым сообщаем о появлении нового типаа файла
-    private final List<Consumer<Map.Entry<String, BooleanProperty>>> listeners = new ArrayList<>();
-
-    public void addTypeAddedListener(Consumer<Map.Entry<String, BooleanProperty>> l) {
-        listeners.add(l);
-    }
+    // 3) Слушатели для добавления и удаления типов
+    private final List<Consumer<Map.Entry<String, BooleanProperty>>> typeAddedListeners   = new ArrayList<>();
+    private final List<Consumer<String>>                          typeRemovedListeners = new ArrayList<>();
 
     public FilterController(ObservableList<FileEntity> view) {
         this.view = view;
         this.masterCopy = new ArrayList<>(view);
 
-        masterCopy.stream()
-                .map(f -> f.getType().toUpperCase())
-                .distinct()
-                .forEach(this::ensureType);
+        // стартовая инициализация: «заполняем» счётчики и чек-боксы
+        for (FileEntity f : view) {
+            incType(f);
+        }
     }
 
-    /** вызов из SearchController при добавлении нового файла */
+    // API для UI
+    public Map<String, BooleanProperty> getTypeChecks() { return typeChecks; }
+    public void addTypeAddedListener(Consumer<Map.Entry<String, BooleanProperty>> l) { typeAddedListeners.add(l); }
+    public void addTypeRemovedListener(Consumer<String> l)                           { typeRemovedListeners.add(l); }
+
+    /** Новый файл в систему попал (или добавлен в view) */
     public void onAddNew(FileEntity f) {
         masterCopy.add(f);
-        ensureType(f.getType());        // вдруг это новый формат
+        incType(f);
         applyAllFilters();
     }
 
-    /** Вызывается при каждом изменении текста в строке поиска. */
+    /** Файл удалили физически (или убрали из view) */
+    public void onRemove(FileEntity f) {
+        masterCopy.remove(f);
+        decType(f);
+        applyAllFilters();
+    }
+
+    /** Поиск по тексту */
     public void onSearchText(String query) {
         if (query == null || query.isBlank()) {
             searchPredicate = f -> true;
@@ -60,21 +69,44 @@ public class FilterController {
         applyAllFilters();
     }
 
-    /** Доступ к BooleanProperty чек-боксов для биндинга в UI. */
-    public Map<String, BooleanProperty> getTypeChecks() { return typeChecks; }
+    // --- внутренняя кухня ---
 
-    /* ------------ приватная «кухня» -------------------------------------- */
+    private void incType(FileEntity f) {
+        String t = f.getType().toUpperCase();
+        typeUsage.merge(t, 1, Integer::sum);
+        if (!typeChecks.containsKey(t)) {
+            BooleanProperty prop = new SimpleBooleanProperty(false);
+            prop.addListener((obs, o, n) -> rebuildTypePredicate());
+            typeChecks.put(t, prop);
+            // уведомляем UI, что появился новый тип
+            Map.Entry<String, BooleanProperty> entry = Map.entry(t, prop);
+            typeAddedListeners.forEach(l -> l.accept(entry));
+        }
+    }
+
+    private void decType(FileEntity f) {
+        String t = f.getType().toUpperCase();
+        int leftover = typeUsage.merge(t, -1, Integer::sum);
+        if (leftover <= 0) {
+            // больше ни одного файла этого типа
+            typeUsage.remove(t);
+            BooleanProperty prop = typeChecks.remove(t);
+            if (prop != null) {
+                // уведомляем UI, что тип нужно убрать
+                typeRemovedListeners.forEach(l -> l.accept(t));
+            }
+            rebuildTypePredicate();
+        }
+    }
 
     private void rebuildTypePredicate() {
-        List<String> selected = typeChecks.entrySet().stream()
+        List<String> sel = typeChecks.entrySet().stream()
                 .filter(e -> e.getValue().get())
                 .map(Map.Entry::getKey)
                 .toList();
-
-        typePredicate = selected.isEmpty()
+        typePredicate = sel.isEmpty()
                 ? f -> true
-                : f -> selected.contains(f.getType().toUpperCase());
-
+                : f -> sel.contains(f.getType().toUpperCase());
         applyAllFilters();
     }
 
@@ -83,20 +115,5 @@ public class FilterController {
                 .filter(searchPredicate.and(typePredicate))
                 .collect(Collectors.toList());
         view.setAll(filtered);
-    }
-
-    /** Если такого типа ещё нет — создаём Property и сообщаем в UI. */
-
-    private void ensureType(String rawType) {
-        String type = rawType.toUpperCase();
-        if (typeChecks.containsKey(type)) return;
-
-        BooleanProperty prop = new SimpleBooleanProperty(false);
-        prop.addListener((obs, o, n) -> rebuildTypePredicate());
-        typeChecks.put(type, prop);
-
-        // уведомляем всех подписчиков (UI) о новом типе
-        Map.Entry<String, BooleanProperty> entry = Map.entry(type, prop);
-        listeners.forEach(l -> l.accept(entry));
     }
 }
