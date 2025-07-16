@@ -71,6 +71,8 @@ public class ResourceManagerApp extends Application {
             new FileAdditionalEntityService(new FileAdditionalDao());
     private final ObservableList<FileEntity> fileItems = FXCollections.observableArrayList();
 
+    private final ObservableList<FileEntity> pinnedItems = FXCollections.observableArrayList();
+
     private SearchController searchController;
 
     private ListView<FileEntity> fileListView;
@@ -100,26 +102,33 @@ public class ResourceManagerApp extends Application {
     public void start(Stage primaryStage) {
         primaryStage.initStyle(StageStyle.TRANSPARENT);
 
+        // Заголовок с кнопками управления окном
         HBox titleBar = buildTitleBar(primaryStage);
 
-        /* ---------- opener до построения UI ---------- */
+        // Открывалка файлов
         Path repoRoot = Paths.get(System.getProperty("repo.root", "exports"));
-        opener = new OpenFileController(repoRoot, getHostServices());   // ← пишем в поле
+        opener = new OpenFileController(repoRoot, getHostServices());
 
-        /* ---------- данные из сервиса ---------- */
+        // Загрузка всех файлов из сервиса
         List<FileEntity> all = fileService.findAll();
         fileItems.setAll(all);
 
-        /* ---------- контроллеры ---------- */
+        // *** Инициализация списка pinnedItems из метаданных ***
+        all.stream()
+                .filter(f -> metaService.getOrCreateMetadata(f.getUuid()).isPinned())
+                .forEach(pinnedItems::add);
+
+        // Контроллеры для фильтрации и поиска
         FilterController filterController = new FilterController(fileItems);
-        searchController                   = new SearchController(filterController);
+        searchController = new SearchController(filterController);
 
-        /* ---------- UI-layout ---------- */
+        // Собираем основной контент
         BorderPane content = new BorderPane();
-        content.setLeft  (buildLeftBar(filterController));
-        content.setCenter(buildCenter());
-        content.setRight (buildPreviewBox());
+        content.setLeft(buildLeftBar(filterController));  // слева – pinned + фильтры
+        content.setCenter(buildCenter());                 // центр – список файлов
+        content.setRight(buildPreviewBox());              // справа – превью + кнопки
 
+        // Округлённое окно
         VBox root = wrapWithRoundedWindow(titleBar, content);
 
         Scene scene = new Scene(root, 900, 600);
@@ -207,16 +216,31 @@ public class ResourceManagerApp extends Application {
         HBox sepPinnedWrapper = new HBox(sepPinned);
         sepPinnedWrapper.setAlignment(Pos.CENTER);
 
-        ListView<String> pinned = new ListView<>(FXCollections.observableArrayList(
-                "course-outline.pdf", "article-link"
-        ));
-        pinned.setMaxHeight(100);
-        pinned.setStyle(
+        ListView<FileEntity> pinnedList = new ListView<>(pinnedItems);
+        pinnedList.setMaxHeight(100);
+        pinnedList.setStyle(
                 "-fx-background-color: #FFFFFF;" +
                         "-fx-background-radius: 8;" +
                         "-fx-border-color: #E0E0E0;" +
                         "-fx-border-radius: 8;"
         );
+        pinnedList.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(FileEntity item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getOrigName());
+            }
+        });
+
+        pinnedList.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                FileEntity sel = pinnedList.getSelectionModel().getSelectedItem();
+                if (sel != null) {
+                    try { opener.open(sel); }
+                    catch (Exception ex) { showError("Не удалось открыть файл", ex); }
+                }
+            }
+        });
 
         Button addBtn = new Button("+ Добавить ресурс");
         addBtn.setMaxWidth(Region.USE_COMPUTED_SIZE);
@@ -254,7 +278,7 @@ public class ResourceManagerApp extends Application {
         return new VBox(10,
                 pinnedLabel,
                 sepPinnedWrapper,
-                pinned,
+                pinnedList,     // ← сюда
                 btnWrapper,
                 sepAfterBtnWrapper,
                 filterLabel,
@@ -595,6 +619,27 @@ public class ResourceManagerApp extends Application {
         String formattedDate = meta.getUpdatedAt()
                 .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
         previewDate.setText("Обновлён: " + formattedDate);
+
+        pinBtn.setDisable(false);
+        pinBtn.setSelected(meta.isPinned());
+        // *** 4) После сохранения метаданных обновляем список
+        pinBtn.setOnAction(e -> {
+            FileEntity sel = getSelectedFile();
+            if (sel != null) {
+                var m = metaService.getOrCreateMetadata(sel.getUuid());
+                boolean nowPinned = pinBtn.isSelected();
+                m.setPinned(nowPinned);
+                m.setUpdatedAt(LocalDateTime.now());
+                metaService.saveMetadata(m);
+
+                // добавляем или удаляем из pinnedItems
+                if (nowPinned) {
+                    if (!pinnedItems.contains(sel)) pinnedItems.add(sel);
+                } else {
+                    pinnedItems.remove(sel);
+                }
+            }
+        });
 
         // 4) Включаем кнопки
         forwardBtn.setDisable(false);
